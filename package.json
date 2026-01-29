@@ -1,0 +1,132 @@
+{
+  "name": "markdown-live-editor",
+  "displayName": "Markdown Live Editor",
+  "description": "WYSIWYG-style live preview editor for Markdown with focus mode",
+  "version": "0.1.0",
+  "publisher": "aleksandersk",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aleksandersk/markdown-live-editor"
+  },
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCustomEditor:markdownLiveEditor.editor"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "markdownLiveEditor.editor",
+        "displayName": "Markdown Live Editor",
+        "selector": [
+          {
+            "filenamePattern": "*.md"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "commands": [
+      {
+        "command": "markdownLiveEditor.formatBold",
+        "title": "Format Bold"
+      },
+      {
+        "command": "markdownLiveEditor.formatItalic",
+        "title": "Format Italic"
+      },
+      {
+        "command": "markdownLiveEditor.formatCode",
+        "title": "Format Code"
+      },
+      {
+        "command": "markdownLiveEditor.insertLink",
+        "title": "Insert Link"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "markdownLiveEditor.formatBold",
+        "key": "ctrl+b",
+        "mac": "cmd+b",
+        "when": "activeCustomEditorId == markdownLiveEditor.editor"
+      },
+      {
+        "command": "markdownLiveEditor.formatItalic",
+        "key": "ctrl+i",
+        "mac": "cmd+i",
+        "when": "activeCustomEditorId == markdownLiveEditor.editor"
+      },
+      {
+        "command": "markdownLiveEditor.formatCode",
+        "key": "ctrl+`",
+        "mac": "cmd+`",
+        "when": "activeCustomEditorId == markdownLiveEditor.editor"
+      },
+      {
+        "command": "markdownLiveEditor.insertLink",
+        "key": "ctrl+k",
+        "mac": "cmd+k",
+        "when": "activeCustomEditorId == markdownLiveEditor.editor"
+      }
+    ],
+    "configuration": {
+      "title": "Markdown Live Editor",
+      "properties": {
+        "markdownLiveEditor.showSyntaxOnFocus": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show markdown syntax when cursor is in a block"
+        },
+        "markdownLiveEditor.autoReloadOnExternalChanges": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically reload file when it changes externally"
+        },
+        "markdownLiveEditor.virtualizationThreshold": {
+          "type": "number",
+          "default": 512000,
+          "description": "File size threshold (in bytes) for enabling virtualization (default: 500KB)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "webpack --mode production",
+    "watch": "webpack --mode development --watch",
+    "typecheck": "tsc --noEmit",
+    "prebuild": "npm run typecheck && npm run lint",
+    "build": "npm run compile",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "test:coverage": "nyc npm test"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.0.0",
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "@vscode/test-electron": "^2.3.8",
+    "eslint": "^8.56.0",
+    "nyc": "^15.1.0",
+    "ts-loader": "^9.5.0",
+    "typescript": "^5.3.0",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4"
+  },
+  "dependencies": {
+    "@tiptap/core": "^3.18.0",
+    "@tiptap/extension-link": "^3.18.0",
+    "@tiptap/markdown": "^3.18.0",
+    "@tiptap/starter-kit": "^3.18.0",
+    "markdown-it": "^14.0.0"
+  }
+}
