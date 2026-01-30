@@ -1,7 +1,8 @@
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
-import Link from '@tiptap/extension-link';
+import { Markdown } from '@tiptap/markdown';
 import type { ExtensionMessage } from '../../types';
+import { serializeMarkdown } from '../../utils/markdownSerializer';
 
 declare function acquireVsCodeApi(): {
   postMessage(message: unknown): void;
@@ -21,21 +22,28 @@ function createEditor(editorElement: HTMLElement): Editor {
       StarterKit.configure({
         heading: { levels: [1, 2, 3, 4, 5, 6] }
       }),
-      Link.configure({ openOnClick: false })
+      Markdown
     ],
     content: '',
+    contentType: 'markdown',
     editorProps: {
       attributes: {
         class: 'prose'
       }
     },
     onUpdate: ({ editor: editorInstance }) => {
-      // TODO: Task 4 will replace getText() with proper markdown serialization
-      // Currently using getText() as temporary solution - loses formatting
-      const text = editorInstance.getText();
+      if (!editorInstance.markdown) {
+        vscode.postMessage({
+          type: 'error',
+          message: 'Markdown extension not initialized'
+        });
+        return;
+      }
+      const rawMarkdown = editorInstance.markdown.serialize(editorInstance.getJSON());
+      const cleanedMarkdown = serializeMarkdown(rawMarkdown);
       vscode.postMessage({
         type: 'update',
-        content: text
+        content: cleanedMarkdown
       });
     }
   });
@@ -104,7 +112,10 @@ function handleDocumentChanged(content: string): void {
 
   // emitUpdate: false prevents the onUpdate callback from firing
   // This avoids infinite update loops
-  editor.commands.setContent(content, { emitUpdate: false });
+  editor.commands.setContent(content, {
+    emitUpdate: false,
+    contentType: 'markdown'
+  });
 }
 
 export function cleanup(): void {
