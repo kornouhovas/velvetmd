@@ -11,10 +11,16 @@ export interface ReadyMessage {
   type: 'ready';
 }
 
+export interface ErrorMessage {
+  type: 'error';
+  message: string;
+  stack?: string;
+}
+
 export interface DocumentChangedMessage {
   type: 'documentChanged';
   content: string;
 }
 
-export type WebviewMessage = UpdateMessage | ReadyMessage;
+export type WebviewMessage = UpdateMessage | ReadyMessage | ErrorMessage;
 export type ExtensionMessage = DocumentChangedMessage;

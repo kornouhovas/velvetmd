@@ -13,9 +13,22 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
    * Time window (ms) after a webview update during which we assume
    * document changes originated from the webview itself.
    * This prevents the echo loop: webview -> document -> webview
+   *
+   * 500ms was chosen to account for:
+   * - VS Code workspace edit latency (~50-100ms typical)
+   * - Event propagation delays
+   * - Safety margin for slower systems
+   *
+   * Values too low may cause update loops; too high may miss rapid external edits.
    */
   // eslint-disable-next-line @typescript-eslint/naming-convention
   private static readonly WEBVIEW_UPDATE_COOLDOWN_MS = 500;
+
+  /**
+   * Debounce delay for document change events (in milliseconds)
+   */
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  private static readonly DOCUMENT_CHANGE_DEBOUNCE_MS = 300;
 
   private readonly lastUpdates = new Map<string, UpdateMetadata>();
   private readonly logger: vscode.OutputChannel;
@@ -36,12 +49,13 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         enableScripts: true,
         localResourceRoots: [
           vscode.Uri.joinPath(this.context.extensionUri, 'dist'),
+          vscode.Uri.joinPath(this.context.extensionUri, 'src'),
           vscode.Uri.joinPath(this.context.extensionUri, 'media')
         ]
       };
 
       // Set initial HTML content
-      webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview, document);
+      webviewPanel.webview.html = this.getHtmlForWebview(webviewPanel.webview);
 
       // Handle messages from webview
       const messageSubscription = this.setupMessageHandling(document, webviewPanel.webview);
@@ -58,16 +72,16 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         changeSubscription.dispose();
         cancelDebounce();
         this.lastUpdates.delete(document.uri.toString());
-        this.logger.appendLine(`[${new Date().toISOString()}] Editor disposed for: ${document.uri.fsPath}`);
+        this.log('INFO', `Editor disposed for: ${document.uri.fsPath}`);
       });
 
       // Send initial content to webview
       this.sendDocumentToWebview(document, webviewPanel.webview);
 
-      this.logger.appendLine(`[${new Date().toISOString()}] Editor opened for: ${document.uri.fsPath}`);
+      this.log('INFO', `Editor opened for: ${document.uri.fsPath}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      this.logger.appendLine(`[${new Date().toISOString()}] ERROR: ${message}`);
+      this.log('ERROR', `Failed to open editor: ${message}`);
       vscode.window.showErrorMessage(`Failed to open Markdown editor: ${message}`);
       throw error;
     }
@@ -79,24 +93,28 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
   ): vscode.Disposable {
     return webview.onDidReceiveMessage(async (message: unknown) => {
       if (!this.isValidWebviewMessage(message)) {
-        this.logger.appendLine(`[${new Date().toISOString()}] Invalid message received`);
+        this.log('WARN', 'Invalid message received from webview');
         return;
       }
 
       switch (message.type) {
         case 'update':
           if (typeof message.content !== 'string') {
-            this.logger.appendLine(`[${new Date().toISOString()}] Invalid content type in update message`);
+            this.log('WARN', 'Invalid content type in update message');
             return;
           }
           await this.handleWebviewUpdate(document, message.content);
           break;
         case 'ready':
-          this.logger.appendLine(`[${new Date().toISOString()}] Webview ready`);
+          this.log('INFO', 'Webview ready');
           this.sendDocumentToWebview(document, webview);
           break;
+        case 'error':
+          this.log('ERROR', `Webview error: ${message.message}`);
+          vscode.window.showErrorMessage(`Markdown Editor: ${message.message}`);
+          break;
         default:
-          this.logger.appendLine(`[${new Date().toISOString()}] Unknown message type`);
+          this.log('WARN', 'Unknown message type');
       }
     });
   }
@@ -106,8 +124,12 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       typeof message === 'object' &&
       message !== null &&
       'type' in message &&
-      (message.type === 'update' || message.type === 'ready')
+      (message.type === 'update' || message.type === 'ready' || message.type === 'error')
     );
+  }
+
+  private log(level: 'INFO' | 'WARN' | 'ERROR', message: string): void {
+    this.logger.appendLine(`[${new Date().toISOString()}] [${level}] ${message}`);
   }
 
   private async handleWebviewUpdate(
@@ -120,7 +142,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       timestamp: Date.now()
     });
 
-    this.logger.appendLine(`[${new Date().toISOString()}] Update from webview: ${content.length} bytes`);
+    this.log('INFO', `Update from webview: ${content.length} bytes`);
 
     const edit = new vscode.WorkspaceEdit();
     const fullRange = new vscode.Range(
@@ -142,17 +164,18 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       if (lastUpdate?.source === 'webview') {
         const timeSinceUpdate = Date.now() - lastUpdate.timestamp;
         if (timeSinceUpdate < MarkdownEditorProvider.WEBVIEW_UPDATE_COOLDOWN_MS) {
-          this.logger.appendLine(
-            `[${new Date().toISOString()}] Skipping update - came from webview (${timeSinceUpdate}ms ago)`
+          this.log(
+            'INFO',
+            `Skipping update - came from webview (${timeSinceUpdate}ms ago)`
           );
           this.lastUpdates.delete(doc.uri.toString());
           return;
         }
       }
 
-      this.logger.appendLine(`[${new Date().toISOString()}] External change detected, updating webview`);
+      this.log('INFO', 'External change detected, updating webview');
       this.sendDocumentToWebview(doc, webviewPanel.webview);
-    }, 300);
+    }, MarkdownEditorProvider.DOCUMENT_CHANGE_DEBOUNCE_MS);
 
     const changeSubscription = vscode.workspace.onDidChangeTextDocument(e => {
       if (e.document.uri.toString() === document.uri.toString()) {
@@ -176,9 +199,13 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     });
   }
 
-  private getHtmlForWebview(webview: vscode.Webview, document: vscode.TextDocument): string {
+  private getHtmlForWebview(webview: vscode.Webview): string {
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview.js')
+    );
+
+    const stylesUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.context.extensionUri, 'src', 'editor', 'webview', 'styles.css')
     );
 
     const nonce = this.getNonce();
@@ -189,54 +216,19 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       <html lang="en">
       <head>
         <meta charset="UTF-8">
-        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${cspSource} https: data:; font-src ${cspSource};">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource}; script-src 'nonce-${nonce}'; img-src ${cspSource}; font-src ${cspSource};">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Markdown Live Editor</title>
-        <style>
-          body {
-            margin: 0;
-            padding: 0;
-            font-family: var(--vscode-font-family);
-            font-size: var(--vscode-font-size);
-            color: var(--vscode-editor-foreground);
-            background-color: var(--vscode-editor-background);
-          }
-          #editor {
-            padding: 20px;
-            max-width: 900px;
-            margin: 0 auto;
-          }
-          .placeholder {
-            padding: 40px;
-            text-align: center;
-            color: var(--vscode-descriptionForeground);
-          }
-        </style>
+        <link href="${stylesUri}" rel="stylesheet">
       </head>
       <body>
-        <div id="editor">
-          <div class="placeholder">
-            <h2>Markdown Live Editor</h2>
-            <p>Task 3 will integrate Tiptap editor here.</p>
-            <p><small>Document: ${this.escapeHtml(document.uri.fsPath)}</small></p>
-          </div>
-        </div>
+        <div id="editor"></div>
         <script nonce="${nonce}" src="${scriptUri}"></script>
       </body>
       </html>
     `;
   }
 
-  private escapeHtml(text: string): string {
-    const escapeMap = new Map([
-      ['&', '&amp;'],
-      ['<', '&lt;'],
-      ['>', '&gt;'],
-      ['"', '&quot;'],
-      ["'", '&#39;']
-    ]);
-    return text.replace(/[&<>"']/g, char => escapeMap.get(char) || char);
-  }
 
   private getNonce(): string {
     return crypto.randomBytes(16).toString('base64');
