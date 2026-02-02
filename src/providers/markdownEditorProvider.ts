@@ -49,7 +49,6 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         enableScripts: true,
         localResourceRoots: [
           vscode.Uri.joinPath(this.context.extensionUri, 'dist'),
-          vscode.Uri.joinPath(this.context.extensionUri, 'src'),
           vscode.Uri.joinPath(this.context.extensionUri, 'media')
         ]
       };
@@ -205,7 +204,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     );
 
     const stylesUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.context.extensionUri, 'src', 'editor', 'webview', 'styles.css')
+      vscode.Uri.joinPath(this.context.extensionUri, 'media', 'webview', 'styles.css')
     );
 
     const nonce = this.getNonce();
