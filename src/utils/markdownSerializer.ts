@@ -35,10 +35,13 @@ export function postprocessMarkdown(markdown: string): string {
   // Normalize excessive blank lines (more than 2 → 2)
   processed = processed.replace(/\n{4,}/g, '\n\n\n');
 
-  // Ensure file ends with single newline (standard convention)
-  processed = processed.replace(/\n*$/, '\n');
+  // Remove leading/trailing whitespace but preserve single trailing newline (POSIX convention)
+  processed = processed.trim();
+  if (processed.length > 0) {
+    processed += '\n';
+  }
 
-  return processed.trim();
+  return processed;
 }
 
 /**
@@ -59,9 +62,9 @@ export function cleanMarkdown(markdown: string): string {
   // Remove empty headings (e.g., "# \n")
   cleaned = cleaned.replace(/^#{1,6}\s*$/gm, '');
 
-  // Normalize multiple spaces to single space (except in code blocks)
-  // This is a simplified version - full implementation would need to parse code blocks
-  cleaned = cleaned.replace(/ {2,}/g, ' ');
+  // NOTE: Multiple space normalization is intentionally skipped to preserve
+  // indentation in code blocks and intentional spacing.
+  // Code block-aware processing could be added if specific use cases emerge.
 
   // Fix broken links [text]( url) → [text](url)
   cleaned = cleaned.replace(/\]\(\s+/g, '](');
@@ -89,7 +92,7 @@ export function normalizeMarkdownWhitespace(markdown: string): string {
   normalized = normalized.replace(/\r\n/g, '\n');
 
   // Remove trailing whitespace from lines (except hard breaks: two spaces at end)
-  normalized = normalized.replace(/(?<!  )\s+$/gm, '');
+  normalized = normalized.replace(/(?<! {2})\s+$/gm, '');
 
   // Normalize paragraph spacing (ensure single blank line between paragraphs)
   normalized = normalized.replace(/\n{3,}/g, '\n\n');

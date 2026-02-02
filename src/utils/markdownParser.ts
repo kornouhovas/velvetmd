@@ -6,13 +6,14 @@
  */
 
 import MarkdownIt from 'markdown-it';
+import { MAX_CONTENT_SIZE_BYTES, formatBytes } from '../constants';
 
 /**
  * Create a configured markdown-it instance with custom rules
  */
 export function createMarkdownParser(): MarkdownIt {
   const md = new MarkdownIt({
-    html: true,
+    html: false, // Disable raw HTML for security (XSS prevention)
     linkify: true,
     typographer: true,
     breaks: false
@@ -101,34 +102,37 @@ export function parseMarkdownToTokens(markdown: string): MarkdownIt.Token[] {
  */
 export function validateMarkdown(markdown: string): {
   valid: boolean;
-  errors: string[];
-  warnings: string[];
+  errors: readonly string[];
+  warnings: readonly string[];
 } {
-  const errors: string[] = [];
-  const warnings: string[] = [];
-
   if (typeof markdown !== 'string') {
-    errors.push('Content must be a string');
-    return { valid: false, errors, warnings };
+    return {
+      valid: false,
+      errors: ['Content must be a string'],
+      warnings: []
+    };
   }
 
-  // Check for excessive file size (> 10MB)
-  if (markdown.length > 10 * 1024 * 1024) {
-    errors.push('Content exceeds maximum size (10MB)');
-  }
+  // Check for excessive file size
+  const sizeError = markdown.length > MAX_CONTENT_SIZE_BYTES
+    ? [`Content exceeds maximum size (${formatBytes(MAX_CONTENT_SIZE_BYTES)})`]
+    : [];
 
   // Check for unmatched code blocks
   const codeBlockCount = (markdown.match(/```/g) || []).length;
-  if (codeBlockCount % 2 !== 0) {
-    warnings.push('Unmatched code block delimiters (```)');
-  }
+  const codeBlockWarning = codeBlockCount % 2 !== 0
+    ? ['Unmatched code block delimiters (```)']
+    : [];
 
   // Check for unmatched brackets
   const openBrackets = (markdown.match(/\[/g) || []).length;
   const closeBrackets = (markdown.match(/\]/g) || []).length;
-  if (openBrackets !== closeBrackets) {
-    warnings.push('Unmatched square brackets');
-  }
+  const bracketWarning = openBrackets !== closeBrackets
+    ? ['Unmatched square brackets']
+    : [];
+
+  const errors = [...sizeError];
+  const warnings = [...codeBlockWarning, ...bracketWarning];
 
   return {
     valid: errors.length === 0,

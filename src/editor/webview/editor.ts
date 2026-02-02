@@ -3,6 +3,7 @@ import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from '@tiptap/markdown';
 import type { ExtensionMessage } from '../../types';
 import { serializeMarkdown } from '../../utils/markdownSerializer';
+import { MAX_CONTENT_SIZE_BYTES, formatBytes } from '../../constants';
 
 declare function acquireVsCodeApi(): {
   postMessage(message: unknown): void;
@@ -12,10 +13,15 @@ declare function acquireVsCodeApi(): {
 
 const vscode = acquireVsCodeApi();
 
-let editor: Editor | null = null;
-let messageHandler: ((event: MessageEvent<ExtensionMessage>) => void) | null = null;
+interface EditorState {
+  editor: Editor | null;
+  messageHandler: ((event: MessageEvent<ExtensionMessage>) => void) | null;
+}
 
-function createEditor(editorElement: HTMLElement): Editor {
+/**
+ * Creates a Tiptap editor instance with markdown support
+ */
+function createTiptapEditor(editorElement: HTMLElement): Editor {
   return new Editor({
     element: editorElement,
     extensions: [
@@ -49,47 +55,11 @@ function createEditor(editorElement: HTMLElement): Editor {
   });
 }
 
-function setupMessageListener(): void {
-  messageHandler = (event: MessageEvent<ExtensionMessage>) => {
-    const message = event.data;
-
-    switch (message.type) {
-      case 'documentChanged':
-        handleDocumentChanged(message.content);
-        break;
-      default:
-        break;
-    }
-  };
-
-  window.addEventListener('message', messageHandler);
-}
-
-function initialize(): void {
-  try {
-    const editorElement = document.getElementById('editor');
-    if (!editorElement) {
-      vscode.postMessage({
-        type: 'error',
-        message: 'Editor element not found'
-      });
-      return;
-    }
-
-    editor = createEditor(editorElement);
-    setupMessageListener();
-    vscode.postMessage({ type: 'ready' });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown initialization error';
-    vscode.postMessage({
-      type: 'error',
-      message: `Editor initialization failed: ${message}`
-    });
-  }
-}
-
-function handleDocumentChanged(content: string): void {
-  if (!editor) {
+/**
+ * Handles document content changes from VS Code
+ */
+function handleDocumentChanged(state: EditorState, content: string): void {
+  if (!state.editor) {
     return;
   }
 
@@ -101,38 +71,103 @@ function handleDocumentChanged(content: string): void {
     return;
   }
 
-  const MAX_CONTENT_SIZE = 10 * 1024 * 1024; // 10MB
-  if (content.length > MAX_CONTENT_SIZE) {
+  if (content.length > MAX_CONTENT_SIZE_BYTES) {
     vscode.postMessage({
       type: 'error',
-      message: 'Document too large (max 10MB)'
+      message: `Document too large (max ${formatBytes(MAX_CONTENT_SIZE_BYTES)})`
     });
     return;
   }
 
   // emitUpdate: false prevents the onUpdate callback from firing
   // This avoids infinite update loops
-  editor.commands.setContent(content, {
+  state.editor.commands.setContent(content, {
     emitUpdate: false,
     contentType: 'markdown'
   });
 }
 
-export function cleanup(): void {
-  if (messageHandler) {
-    window.removeEventListener('message', messageHandler);
-    messageHandler = null;
-  }
-  if (editor) {
-    editor.destroy();
-    editor = null;
+/**
+ * Sets up message listener for VS Code events
+ */
+function setupMessageListener(state: EditorState): void {
+  const handler = (event: MessageEvent<ExtensionMessage>) => {
+    const message = event.data;
+
+    switch (message.type) {
+      case 'documentChanged':
+        handleDocumentChanged(state, message.content);
+        break;
+      default:
+        break;
+    }
+  };
+
+  state.messageHandler = handler;
+  window.addEventListener('message', handler);
+}
+
+/**
+ * Initializes the editor
+ */
+function initializeEditor(state: EditorState): void {
+  try {
+    const editorElement = document.getElementById('editor');
+    if (!editorElement) {
+      vscode.postMessage({
+        type: 'error',
+        message: 'Editor element not found'
+      });
+      return;
+    }
+
+    state.editor = createTiptapEditor(editorElement);
+    setupMessageListener(state);
+    vscode.postMessage({ type: 'ready' });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown initialization error';
+    vscode.postMessage({
+      type: 'error',
+      message: `Editor initialization failed: ${message}`
+    });
   }
 }
+
+/**
+ * Cleans up editor resources
+ */
+function cleanupEditor(state: EditorState): void {
+  if (state.messageHandler) {
+    window.removeEventListener('message', state.messageHandler);
+    state.messageHandler = null;
+  }
+  if (state.editor) {
+    state.editor.destroy();
+    state.editor = null;
+  }
+}
+
+/**
+ * Creates an editor manager that encapsulates state
+ */
+function createEditorManager() {
+  const state: EditorState = {
+    editor: null,
+    messageHandler: null
+  };
+
+  return {
+    initialize: () => initializeEditor(state),
+    cleanup: () => cleanupEditor(state)
+  };
+}
+
+const editorManager = createEditorManager();
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initialize);
+  document.addEventListener('DOMContentLoaded', editorManager.initialize);
 } else {
-  initialize();
+  editorManager.initialize();
 }
 
-export { initialize };
+export const { initialize, cleanup } = editorManager;
