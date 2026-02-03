@@ -18,8 +18,7 @@ body {
 
 #editor {
   padding: 20px;
-  max-width: 900px;
-  margin: 0 auto;
+  margin: 0;
 }
 
 /* ProseMirror Editor Styles */
@@ -27,6 +26,7 @@ body {
   outline: none;
   min-height: 100vh;
   padding: 0;
+  margin: 0;
 }
 
 .ProseMirror p {
