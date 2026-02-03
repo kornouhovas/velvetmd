@@ -1,6 +1,14 @@
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from '@tiptap/markdown';
+import Link from '@tiptap/extension-link';
+import Image from '@tiptap/extension-image';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableCell } from '@tiptap/extension-table-cell';
+import { TableHeader } from '@tiptap/extension-table-header';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
 import type { ExtensionMessage } from '../../types';
 import { serializeMarkdown } from '../../utils/markdownSerializer';
 import { MAX_CONTENT_SIZE_BYTES, formatBytes } from '../../constants';
@@ -22,11 +30,51 @@ interface EditorState {
  * Creates a Tiptap editor instance with markdown support
  */
 function createTiptapEditor(editorElement: HTMLElement): Editor {
-  return new Editor({
+  const editor = new Editor({
     element: editorElement,
     extensions: [
       StarterKit.configure({
-        heading: { levels: [1, 2, 3, 4, 5, 6] }
+        heading: { levels: [1, 2, 3, 4, 5, 6] },
+        // Disable link in StarterKit to avoid conflict with our custom Link configuration
+        link: false
+      }),
+      Link.configure({
+        openOnClick: true,
+        HTMLAttributes: {
+          target: '_blank',
+          rel: 'noopener noreferrer'
+        }
+      }),
+      Image.configure({
+        inline: true,
+        HTMLAttributes: {
+          class: 'markdown-image'
+        }
+      }),
+      Table.configure({
+        resizable: false,
+        HTMLAttributes: {
+          class: 'tiptap-table'
+        }
+      }),
+      TableRow,
+      TableCell,
+      TableHeader,
+      TaskList.configure({
+        HTMLAttributes: {
+          class: 'task-list'
+        }
+      }),
+      TaskItem.extend({
+        addNodeView() {
+          // Return null to disable custom NodeView and use renderHTML instead
+          return null;
+        }
+      }).configure({
+        nested: true,
+        HTMLAttributes: {
+          class: 'task-item'
+        }
       }),
       Markdown
     ],
@@ -53,6 +101,12 @@ function createTiptapEditor(editorElement: HTMLElement): Editor {
       });
     }
   });
+
+  console.log('Editor created');
+  console.log('Extensions:', editor.extensionManager.extensions.map((e: any) => e.name));
+  console.log('Has markdown?', !!editor.markdown);
+
+  return editor;
 }
 
 /**
@@ -79,12 +133,16 @@ function handleDocumentChanged(state: EditorState, content: string): void {
     return;
   }
 
+  console.log('Setting content:', content.substring(0, 200));
+
   // emitUpdate: false prevents the onUpdate callback from firing
   // This avoids infinite update loops
   state.editor.commands.setContent(content, {
     emitUpdate: false,
     contentType: 'markdown'
   });
+
+  console.log('Editor JSON after setContent:', JSON.stringify(state.editor.getJSON(), null, 2));
 }
 
 /**

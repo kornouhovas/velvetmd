@@ -209,16 +209,17 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
 
     const nonce = this.getNonce();
     const cspSource = webview.cspSource;
+    const timestamp = Date.now();
 
     return `
       <!DOCTYPE html>
       <html lang="en">
       <head>
         <meta charset="UTF-8">
-        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource}; script-src 'nonce-${nonce}'; img-src ${cspSource}; font-src ${cspSource};">
+        <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${cspSource} https: data:; font-src ${cspSource};">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Markdown Live Editor</title>
-        <link href="${stylesUri}" rel="stylesheet">
+        <link href="${stylesUri}?t=${timestamp}" rel="stylesheet">
       </head>
       <body>
         <div id="editor"></div>
