@@ -215,11 +215,9 @@ Code quality checklist (`.claude/QUALITY_CHECKLIST.md`):
 
 ### Known Limitations
 
-1. **Round-trip Tests:** 13 of 26 tests currently fail - this is expected during PoC phase. Tests verify that raw Tiptap output matches input, but actual implementation uses `serializeMarkdown()` utility which fixes these issues.
+1. **Round-trip Tests:** Some tests currently fail - this is expected during PoC phase. Tests verify that raw Tiptap output matches input, but actual implementation uses `serializeMarkdown()` utility which fixes these issues.
 
 2. **Webview Bundle Size:** 398KB (exceeds webpack recommendation of 244KB) - acceptable for rich text editor with Tiptap dependencies.
-
-3. **Task Lists:** `- [ ]` checkboxes convert to regular lists (known limitation, documented in tests).
 
 ### Development Workflow
 

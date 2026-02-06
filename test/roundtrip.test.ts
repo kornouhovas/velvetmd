@@ -4,6 +4,8 @@ import { strict as assert } from 'node:assert';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from '@tiptap/markdown';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
 
 /**
  * Round-trip Markdown Tests
@@ -25,7 +27,19 @@ describe('Markdown Round-trip Conversion', () => {
         StarterKit.configure({
           heading: { levels: [1, 2, 3, 4, 5, 6] }
         }),
-        Markdown
+        TaskList.configure({
+          HTMLAttributes: {
+            class: 'task-list'
+          }
+        }),
+        TaskItem.configure({
+          nested: true
+        }),
+        Markdown.configure({
+          markedOptions: {
+            gfm: true
+          }
+        })
       ],
       content: '',
       contentType: 'markdown'
@@ -198,29 +212,11 @@ describe('Markdown Round-trip Conversion', () => {
     'should preserve strikethrough'
   );
 
-  // Test 23: Task list (checkboxes) - Known limitation: checkboxes not preserved
-  it('should convert task lists to regular lists (known limitation)', () => {
-    const markdown = '- [ ] Unchecked task\n- [x] Checked task';
-    editor.commands.setContent(markdown, {
-      emitUpdate: false,
-      contentType: 'markdown'
-    });
-
-    const result = editor.markdown.serialize(editor.getJSON());
-    const normalized = (str: string) =>
-      str
-        .trim()
-        .replace(/\r\n/g, '\n')
-        .replace(/\n{3,}/g, '\n\n')
-        .replace(/&nbsp;/g, '');
-
-    // Task lists are converted to regular lists
-    assert.equal(
-      normalized(result),
-      '- Unchecked task\n- Checked task',
-      'Task lists should be converted to regular lists'
-    );
-  });
+  // Test 23: Task lists with GFM enabled
+  testRoundTrip(
+    '- [ ] Unchecked task\n- [x] Checked task',
+    'should preserve task lists with checkboxes'
+  );
 
   // Test 24: Multiple paragraphs with inline formatting
   testRoundTrip(
