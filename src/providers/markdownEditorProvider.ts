@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import { debounce } from '../utils/debounce';
 import { WebviewMessage } from '../types';
+import { MAX_CONTENT_SIZE_BYTES, formatBytes } from '../constants';
 
 interface UpdateMetadata {
   source: 'webview' | 'external';
@@ -102,6 +103,12 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         case 'update':
           if (typeof message.content !== 'string') {
             this.log('WARN', 'Invalid content type in update message');
+            return;
+          }
+          // SECURITY: Validate content size to prevent DoS attacks from compromised webview
+          if (message.content.length > MAX_CONTENT_SIZE_BYTES) {
+            this.log('WARN', `Content too large: ${formatBytes(message.content.length)} (max: ${formatBytes(MAX_CONTENT_SIZE_BYTES)})`);
+            vscode.window.showWarningMessage(`Content size ${formatBytes(message.content.length)} exceeds maximum allowed size of ${formatBytes(MAX_CONTENT_SIZE_BYTES)}`);
             return;
           }
           await this.handleWebviewUpdate(document, message.content);

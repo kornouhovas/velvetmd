@@ -46,7 +46,9 @@ function createTiptapEditor(editorElement: HTMLElement): Editor {
         HTMLAttributes: {
           target: '_blank',
           rel: 'noopener noreferrer'
-        }
+        },
+        // SECURITY: Only allow http(s) and mailto URLs to prevent javascript: URI attacks
+        validate: (href: string) => /^(https?:\/\/|mailto:)/.test(href)
       }),
       Image.configure({
         inline: true,
