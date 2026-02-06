@@ -21,6 +21,11 @@ declare function acquireVsCodeApi(): {
 
 const vscode = acquireVsCodeApi();
 
+// NOTE: EditorState is intentionally mutable for lifecycle management in browser environment.
+// The state contains DOM references (Editor, MessageHandler) that must be updated during
+// initialization and cleanup phases. This is documented as 'mutable by design' in CLAUDE.md.
+// Alternative immutable patterns (ref-cells, state machines) would add unnecessary complexity
+// for lifecycle state in a webview context.
 interface EditorState {
   editor: Editor | null;
   messageHandler: ((event: MessageEvent<ExtensionMessage>) => void) | null;
@@ -34,8 +39,6 @@ function createTiptapEditor(editorElement: HTMLElement): Editor {
     element: editorElement,
     extensions: [
       StarterKit.configure({
-        heading: { levels: [1, 2, 3, 4, 5, 6] },
-        // Disable link in StarterKit to avoid conflict with our custom Link configuration
         link: false
       }),
       Link.configure({
@@ -65,18 +68,14 @@ function createTiptapEditor(editorElement: HTMLElement): Editor {
           class: 'task-list'
         }
       }),
-      TaskItem.extend({
-        addNodeView() {
-          // Return null to disable custom NodeView and use renderHTML instead
-          return null;
-        }
-      }).configure({
-        nested: true,
-        HTMLAttributes: {
-          class: 'task-item'
-        }
+      TaskItem.configure({
+        nested: true
       }),
-      Markdown
+      Markdown.configure({
+        markedOptions: {
+          gfm: true
+        }
+      })
     ],
     content: '',
     contentType: 'markdown',
@@ -101,10 +100,6 @@ function createTiptapEditor(editorElement: HTMLElement): Editor {
       });
     }
   });
-
-  console.log('Editor created');
-  console.log('Extensions:', editor.extensionManager.extensions.map((e: any) => e.name));
-  console.log('Has markdown?', !!editor.markdown);
 
   return editor;
 }
@@ -133,16 +128,17 @@ function handleDocumentChanged(state: EditorState, content: string): void {
     return;
   }
 
-  console.log('Setting content:', content.substring(0, 200));
+  // Get current content from editor and normalize it the same way as outgoing updates
+  const rawMarkdown = state.editor.markdown?.serialize(state.editor.getJSON()) || '';
+  const currentMarkdown = serializeMarkdown(rawMarkdown);
 
-  // emitUpdate: false prevents the onUpdate callback from firing
-  // This avoids infinite update loops
-  state.editor.commands.setContent(content, {
-    emitUpdate: false,
-    contentType: 'markdown'
-  });
-
-  console.log('Editor JSON after setContent:', JSON.stringify(state.editor.getJSON(), null, 2));
+  // Only update if content actually changed (prevents unnecessary cursor resets)
+  if (currentMarkdown !== content) {
+    state.editor.commands.setContent(content, {
+      emitUpdate: false,
+      contentType: 'markdown'
+    });
+  }
 }
 
 /**

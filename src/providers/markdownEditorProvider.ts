@@ -31,6 +31,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
   private static readonly DOCUMENT_CHANGE_DEBOUNCE_MS = 300;
 
   private readonly lastUpdates = new Map<string, UpdateMetadata>();
+  private readonly lastWebviewContent = new Map<string, string>();
   private readonly logger: vscode.OutputChannel;
 
   constructor(private readonly context: vscode.ExtensionContext) {
@@ -71,6 +72,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         changeSubscription.dispose();
         cancelDebounce();
         this.lastUpdates.delete(document.uri.toString());
+        this.lastWebviewContent.delete(document.uri.toString());
         this.log('INFO', `Editor disposed for: ${document.uri.fsPath}`);
       });
 
@@ -136,10 +138,14 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     content: string
   ): Promise<void> {
     // Track update source to prevent loops
+    // Update timestamp on EVERY update from webview, not just the first
     this.lastUpdates.set(document.uri.toString(), {
       source: 'webview',
-      timestamp: Date.now()
+      timestamp: Date.now()  // Always reflects MOST RECENT webview update
     });
+
+    // Store content for content-based echo detection
+    this.lastWebviewContent.set(document.uri.toString(), content);
 
     this.log('INFO', `Update from webview: ${content.length} bytes`);
 
@@ -167,11 +173,26 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
             'INFO',
             `Skipping update - came from webview (${timeSinceUpdate}ms ago)`
           );
-          this.lastUpdates.delete(doc.uri.toString());
+          // DON'T delete here - keep the entry to protect against subsequent debounced updates
           return;
         }
       }
 
+      // Cooldown expired - check if content matches last webview update (slow echo)
+      const lastContent = this.lastWebviewContent.get(doc.uri.toString());
+      if (lastContent === doc.getText()) {
+        this.log(
+          'INFO',
+          'Skipping update - content matches last webview update (slow echo)'
+        );
+        this.lastWebviewContent.delete(doc.uri.toString());
+        this.lastUpdates.delete(doc.uri.toString());
+        return;
+      }
+
+      // Genuine external change
+      this.lastUpdates.delete(doc.uri.toString());
+      this.lastWebviewContent.delete(doc.uri.toString());
       this.log('INFO', 'External change detected, updating webview');
       this.sendDocumentToWebview(doc, webviewPanel.webview);
     }, MarkdownEditorProvider.DOCUMENT_CHANGE_DEBOUNCE_MS);
@@ -216,6 +237,13 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       <html lang="en">
       <head>
         <meta charset="UTF-8">
+        <!--
+          SECURITY NOTE: 'unsafe-inline' is required for Tiptap/ProseMirror editor functionality.
+          ProseMirror dynamically generates inline styles for editor behavior (cursor positioning,
+          selections, decorations). This is a known limitation of ProseMirror-based editors.
+          Alternative nonce-based CSP would require patching Tiptap's core, which is not feasible.
+          This is an acceptable risk for a markdown editor operating on local files.
+        -->
         <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${cspSource} https: data:; font-src ${cspSource};">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Markdown Live Editor</title>

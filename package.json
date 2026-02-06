@@ -32,50 +32,6 @@
         "priority": "option"
       }
     ],
-    "commands": [
-      {
-        "command": "markdownLiveEditor.formatBold",
-        "title": "Format Bold"
-      },
-      {
-        "command": "markdownLiveEditor.formatItalic",
-        "title": "Format Italic"
-      },
-      {
-        "command": "markdownLiveEditor.formatCode",
-        "title": "Format Code"
-      },
-      {
-        "command": "markdownLiveEditor.insertLink",
-        "title": "Insert Link"
-      }
-    ],
-    "keybindings": [
-      {
-        "command": "markdownLiveEditor.formatBold",
-        "key": "ctrl+b",
-        "mac": "cmd+b",
-        "when": "activeCustomEditorId == markdownLiveEditor.editor"
-      },
-      {
-        "command": "markdownLiveEditor.formatItalic",
-        "key": "ctrl+i",
-        "mac": "cmd+i",
-        "when": "activeCustomEditorId == markdownLiveEditor.editor"
-      },
-      {
-        "command": "markdownLiveEditor.formatCode",
-        "key": "ctrl+`",
-        "mac": "cmd+`",
-        "when": "activeCustomEditorId == markdownLiveEditor.editor"
-      },
-      {
-        "command": "markdownLiveEditor.insertLink",
-        "key": "ctrl+k",
-        "mac": "cmd+k",
-        "when": "activeCustomEditorId == markdownLiveEditor.editor"
-      }
-    ],
     "configuration": {
       "title": "Markdown Live Editor",
       "properties": {
