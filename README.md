@@ -104,7 +104,6 @@ npx tsx test/link-image.test.ts
 ## Documentation
 
 - [CLAUDE.md](./CLAUDE.md) - Architecture and implementation details
-- [CHANGELOG.md](./CHANGELOG.md) - Version history
 
 ## License
 

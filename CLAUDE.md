@@ -190,7 +190,8 @@ Extension settings in `package.json` → `contributes.configuration`:
 
 **Utilities (Shared concepts, separate bundles):**
 - `src/constants.ts` - Centralized constants, `formatBytes()`
-- `src/utils/markdownSerializer.ts` - AST → Markdown (~165 lines)
+- `src/utils/markdownSerializer.ts` - Editor → Markdown serialization (~165 lines)
+- `src/utils/debounce.ts` - Debouncing utility
 - `src/types.ts` - Message type definitions
 
 **Tests:**
