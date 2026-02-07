@@ -17,7 +17,7 @@ body {
 }
 
 #editor {
-  padding: 20px;
+  padding: 20px 20px 20px 72px; /* top right bottom left - VS Code standard */
   margin: 0;
 }
 
