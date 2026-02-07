@@ -6,58 +6,65 @@
 
 🚧 **Pre-Development (PoC Phase)** - v0.1.0-alpha
 
-## Overview
+This extension is in early development. Features and API may change.
 
-VS Code extension providing Obsidian-like live preview editing for Markdown files with WYSIWYG interface. Uses Tiptap (ProseMirror wrapper) with bidirectional synchronization between the editor and VS Code's text document model.
+## Features
 
-## Key Features
+**Velvet MD** brings a WYSIWYG-style editing experience to Markdown files in VS Code, similar to Obsidian's live preview mode.
 
-- ✨ **Live Preview Mode** - WYSIWYG editing with instant formatting
-- 🔄 **Bidirectional Sync** - Maintains round-trip fidelity between markdown text and editor state
-- 🎯 **Dual-Bundle Architecture** - Separate compilation targets for extension host and webview
-- 🔒 **Security** - Strict CSP with cryptographic nonces, XSS prevention
-- ⚡ **Performance** - Optimized for files up to 10MB with debounced updates
+- **Live Preview Editing** - See formatted text as you type with instant visual feedback
+- **Supported Markdown Elements:**
+  - Headings (H1-H6)
+  - Text formatting (bold, italic, strikethrough)
+  - Links and images
+  - Code blocks with syntax highlighting
+  - Tables
+  - Task lists with checkboxes
+  - Blockquotes
+  - Horizontal rules
+  - Ordered and unordered lists
+- **Bidirectional Sync** - Changes sync seamlessly between the editor and file system
+- **Focus Mode** - Show markdown syntax only when editing a block
+- **Large File Support** - Optimized for files up to 10MB
 
-## Architecture
+## Usage
 
-### Dual-Bundle System
+### Opening Files
 
-Two independent compilation targets:
+Right-click any `.md` file in VS Code and select:
+- **"Open With..."** → **"Velvet MD"**
 
-1. **Extension Bundle** (`dist/extension.js`)
-   - Target: Node.js
-   - Environment: VS Code Extension Host
-   - Manages document synchronization and VS Code API integration
+Or set Velvet MD as the default editor for Markdown files:
+1. Right-click a `.md` file
+2. Select **"Open With..."**
+3. Choose **"Velvet MD"**
+4. Click **"Configure default editor for '*.md'..."**
 
-2. **Webview Bundle** (`dist/webview.js`)
-   - Target: Web/Browser
-   - Environment: VS Code Webview (isolated iframe)
-   - Handles Tiptap editor and message-based communication
+### Editing
 
-### Synchronization Flow
+- Click anywhere to start editing
+- Press Escape to exit focus mode
+- Changes save automatically to the file
 
-```
-VS Code Document (plain text .md)
-        ↕ (debounced 300ms)
-MarkdownEditorProvider (extension host)
-        ↕ (postMessage)
-Tiptap Editor (webview)
-```
+## Configuration
 
-## Tech Stack
+Configure the extension in VS Code settings (File → Preferences → Settings):
 
-- **Editor:** Tiptap (ProseMirror wrapper)
-- **Markdown Parser:** markdown-it
-- **Language:** TypeScript
-- **Build:** Webpack (dual-bundle configuration)
-- **Testing:** Node.js test runner + JSDOM
+- **`velvetMd.showSyntaxOnFocus`** (default: `true`)
+  Show markdown syntax when cursor is in a block
+
+- **`velvetMd.autoReloadOnExternalChanges`** (default: `true`)
+  Automatically reload file when it changes externally (e.g., git operations)
+
+- **`velvetMd.virtualizationThreshold`** (default: `512000`)
+  File size threshold in bytes for enabling virtualization (500KB)
 
 ## Development
 
 ### Prerequisites
 
-- VS Code 1.80+
-- Node.js 20+
+- VS Code 1.80 or higher
+- Node.js 20 or higher
 - npm
 
 ### Commands
@@ -66,7 +73,7 @@ Tiptap Editor (webview)
 # Install dependencies
 npm install
 
-# Development with watch mode
+# Development with watch mode (auto-recompile on changes)
 npm run watch
 
 # Type checking (required before commits)
@@ -78,95 +85,27 @@ npm run lint
 # Production build
 npm run compile
 
-# Full build pipeline
+# Full build pipeline (typecheck + lint + compile)
 npm run build
 
 # Run tests
-npx tsx test/<filename>.test.ts
-```
-
-### Project Structure
-
-```
-src/
-├── extension.ts                    # Extension entry point
-├── providers/
-│   └── markdownEditorProvider.ts   # Custom editor provider (236 lines)
-├── editor/
-│   └── webview/
-│       └── editor.ts               # Tiptap initialization (150 lines)
-├── utils/
-│   ├── markdownParser.ts           # Markdown → AST (142 lines)
-│   ├── markdownSerializer.ts       # AST → Markdown (165 lines)
-│   └── debounce.ts                 # Debouncing utility
-├── constants.ts                    # Centralized constants
-└── types.ts                        # Message protocol types
-
-test/
-├── setup.ts                        # JSDOM configuration
-├── roundtrip.test.ts               # Round-trip fidelity tests (26 cases)
-└── constants.test.ts               # Utility function tests (14 tests)
-
-media/
-└── webview/
-    └── styles.css                  # Editor styling
-```
-
-## Configuration
-
-Available settings (`package.json` → `contributes.configuration`):
-
-- `showSyntaxOnFocus` (boolean, default: true) - Show markdown syntax when editing
-- `autoReloadOnExternalChanges` (boolean, default: true) - Auto-reload on external edits
-- `virtualizationThreshold` (number, default: 512000) - Performance threshold for large files
-
-## Testing
-
-### Running Tests
-
-```bash
-# Round-trip conversion tests
-npx tsx test/roundtrip.test.ts
-
-# Utility function tests
 npx tsx test/constants.test.ts
+npx tsx test/roundtrip.test.ts
+npx tsx test/link-image.test.ts
 ```
 
-Tests use Node.js built-in test runner with JSDOM for DOM simulation.
+### Testing in VS Code
 
-## Quality Standards
-
-All code must pass:
-- ✅ **Type checking:** `npm run typecheck` (0 errors)
-- ✅ **Linting:** `npm run lint` (0 errors, warnings justified)
-- ✅ **Compilation:** `npm run compile` (must succeed)
-
-## Known Limitations
-
-1. **Round-trip Tests:** Some tests currently fail - this is expected during PoC phase. The actual implementation uses `serializeMarkdown()` utility which fixes these issues.
-
-2. **Webview Bundle Size:** 398KB (exceeds webpack recommendation of 244KB) - acceptable for rich text editor with Tiptap dependencies.
-
-## Debugging
-
-Extension logs available via:
-```typescript
-this.logger = vscode.window.createOutputChannel('Velvet MD');
-this.logger.appendLine('Debug message');
-```
-
-View logs: VS Code → Output panel → "Velvet MD"
+1. Open this project in VS Code
+2. Press F5 to launch Extension Development Host
+3. Open any `.md` file
+4. Right-click → "Open With..." → "Velvet MD"
 
 ## Documentation
 
-- [CLAUDE.md](./CLAUDE.md) - Detailed architecture and development guide
+- [CLAUDE.md](./CLAUDE.md) - Architecture and implementation details
 - [CHANGELOG.md](./CHANGELOG.md) - Version history
 
 ## License
 
-TBD
-
----
-
-**Version:** 0.1.0-alpha
-**Last Updated:** 2026-02-07
+MIT - See [LICENSE](./LICENSE) file for details
