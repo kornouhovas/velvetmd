@@ -1,6 +1,6 @@
 # Velvet MD
 
-> Obsidian-like live preview editor for Markdown in VS Code
+> Live preview editor for Markdown in VS Code
 
 ## Status
 
@@ -10,7 +10,7 @@ This extension is in early development. Features and API may change.
 
 ## Features
 
-**Velvet MD** brings a WYSIWYG-style editing experience to Markdown files in VS Code, similar to Obsidian's live preview mode.
+**Velvet MD** brings a WYSIWYG-style editing experience to Markdown files in VS Code.
 
 - **Live Preview Editing** - See formatted text as you type with instant visual feedback
 - **Supported Markdown Elements:**
@@ -108,3 +108,7 @@ npx tsx test/link-image.test.ts
 ## License
 
 MIT - See [LICENSE](./LICENSE) file for details
+
+---
+
+Built with [Claude Code](https://claude.ai/code)
