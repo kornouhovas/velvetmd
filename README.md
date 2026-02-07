@@ -1,4 +1,4 @@
-# Markdown Live Editor
+# Velvet MD
 > Obsidian-like live preview editor for Markdown in VS Code
 ## Status
 🚧 **Project Status:** Pre-Development (PoC Phase)

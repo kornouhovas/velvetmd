@@ -130,7 +130,7 @@ Symbols: & < > " ' / \
 This is a very long line of text that should wrap properly in the editor without breaking the layout or causing horizontal scrolling issues in the preview mode which is important for readability and user experience.
 ## 14. Practical Example
 ### Project README Structure
-**Project Name**: Markdown Live Editor
+**Project Name**: Velvet MD
 **Description**: A VS Code extension providing Obsidian-like live preview editing for Markdown files.
 **Features**:
 - [x] Live preview mode

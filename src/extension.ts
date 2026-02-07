@@ -5,7 +5,7 @@ export function activate(context: vscode.ExtensionContext): void {
   const provider = new MarkdownEditorProvider(context);
 
   const registration = vscode.window.registerCustomEditorProvider(
-    'markdownLiveEditor.editor',
+    'velvetMd.editor',
     provider,
     {
       webviewOptions: {

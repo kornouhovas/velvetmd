@@ -1,13 +1,13 @@
 {
-  "name": "markdown-live-editor",
-  "displayName": "Markdown Live Editor",
+  "name": "velvet-md",
+  "displayName": "Velvet MD",
   "description": "WYSIWYG-style live preview editor for Markdown with focus mode",
   "version": "0.1.0",
   "publisher": "aleksandersk",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/aleksandersk/markdown-live-editor"
+    "url": "https://github.com/aleksandersk/velvet-md"
   },
   "engines": {
     "vscode": "^1.80.0"
@@ -16,14 +16,14 @@
     "Other"
   ],
   "activationEvents": [
-    "onCustomEditor:markdownLiveEditor.editor"
+    "onCustomEditor:velvetMd.editor"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "customEditors": [
       {
-        "viewType": "markdownLiveEditor.editor",
-        "displayName": "Markdown Live Editor",
+        "viewType": "velvetMd.editor",
+        "displayName": "Velvet MD",
         "selector": [
           {
             "filenamePattern": "*.md"
@@ -33,19 +33,19 @@
       }
     ],
     "configuration": {
-      "title": "Markdown Live Editor",
+      "title": "Velvet MD",
       "properties": {
-        "markdownLiveEditor.showSyntaxOnFocus": {
+        "velvetMd.showSyntaxOnFocus": {
           "type": "boolean",
           "default": true,
           "description": "Show markdown syntax when cursor is in a block"
         },
-        "markdownLiveEditor.autoReloadOnExternalChanges": {
+        "velvetMd.autoReloadOnExternalChanges": {
           "type": "boolean",
           "default": true,
           "description": "Automatically reload file when it changes externally"
         },
-        "markdownLiveEditor.virtualizationThreshold": {
+        "velvetMd.virtualizationThreshold": {
           "type": "number",
           "default": 512000,
           "description": "File size threshold (in bytes) for enabling virtualization (default: 500KB)"

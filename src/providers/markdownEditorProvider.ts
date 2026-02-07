@@ -36,7 +36,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
   private readonly logger: vscode.OutputChannel;
 
   constructor(private readonly context: vscode.ExtensionContext) {
-    this.logger = vscode.window.createOutputChannel('Markdown Live Editor');
+    this.logger = vscode.window.createOutputChannel('Velvet MD');
     context.subscriptions.push(this.logger);
   }
 
@@ -84,7 +84,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       this.log('ERROR', `Failed to open editor: ${message}`);
-      vscode.window.showErrorMessage(`Failed to open Markdown editor: ${message}`);
+      vscode.window.showErrorMessage(`Failed to open Velvet MD editor: ${message}`);
       throw error;
     }
   }
@@ -119,7 +119,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
           break;
         case 'error':
           this.log('ERROR', `Webview error: ${message.message}`);
-          vscode.window.showErrorMessage(`Markdown Editor: ${message.message}`);
+          vscode.window.showErrorMessage(`Velvet MD: ${message.message}`);
           break;
         default:
           this.log('WARN', 'Unknown message type');
@@ -253,7 +253,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         -->
         <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; img-src ${cspSource} https: data:; font-src ${cspSource};">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Markdown Live Editor</title>
+        <title>Velvet MD</title>
         <link href="${stylesUri}?t=${timestamp}" rel="stylesheet">
       </head>
       <body>

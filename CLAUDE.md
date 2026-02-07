@@ -243,8 +243,8 @@ See `PRD.md` for detailed functional requirements:
 
 Extension logs available via:
 ```typescript
-this.logger = vscode.window.createOutputChannel('Markdown Live Editor');
+this.logger = vscode.window.createOutputChannel('Velvet MD');
 this.logger.appendLine('Debug message');
 ```
 
-View logs: VS Code → Output panel → "Markdown Live Editor"
+View logs: VS Code → Output panel → "Velvet MD"

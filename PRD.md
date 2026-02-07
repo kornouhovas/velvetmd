@@ -1,4 +1,4 @@
-# PRD: VS Code Markdown Live Editor
+# PRD: VS Code Velvet MD
 ## Overview
 Плагин для VS Code, обеспечивающий редактирование Markdown файлов в режиме live preview с WYSIWYG-подобным интерфейсом, аналогичным Obsidian.
 ## Problem Statement
@@ -168,7 +168,7 @@
 ---
 ## File Structure
 ```
-markdown-live-editor/
+velvet-md/
 ├── package.json
 ├── tsconfig.json
 ├── webpack.config.js
@@ -220,43 +220,43 @@ markdown-live-editor/
 ```jsonc
 {
   // Открывать .md файлы в live-режиме по умолчанию
-  "markdownLiveEditor.defaultEditor": true,
+  "velvetMd.defaultEditor": true,
   // Показывать синтаксис при фокусе на элементе
-  "markdownLiveEditor.showSyntaxOnFocus": true,
+  "velvetMd.showSyntaxOnFocus": true,
   // Ширина редактора (px или %)
-  "markdownLiveEditor.editorWidth": "800px",
+  "velvetMd.editorWidth": "800px",
   // Шрифт
-  "markdownLiveEditor.fontFamily": "inherit",
-  "markdownLiveEditor.fontSize": 16,
+  "velvetMd.fontFamily": "inherit",
+  "velvetMd.fontSize": 16,
   // Автосохранение
-  "markdownLiveEditor.autoSave": true,
-  "markdownLiveEditor.autoSaveDelay": 1000,
+  "velvetMd.autoSave": true,
+  "velvetMd.autoSaveDelay": 1000,
   // Performance
-  "markdownLiveEditor.virtualizationThreshold": 500, // KB
-  "markdownLiveEditor.lazyLoadImages": true,
+  "velvetMd.virtualizationThreshold": 500, // KB
+  "velvetMd.lazyLoadImages": true,
   // Validation
-  "markdownLiveEditor.enableLinting": true,
-  "markdownLiveEditor.validateLinks": true
+  "velvetMd.enableLinting": true,
+  "velvetMd.validateLinks": true
 }
 ```
 ---
 ## Commands
 | Command ID                          | Title                 | Description                |
 | ----------------------------------- | --------------------- | -------------------------- |
-| `markdownLiveEditor.open`           | Open with Live Editor | Открыть файл в live-режиме |
-| `markdownLiveEditor.toggle`         | Toggle Preview Mode   | Переключить raw/live       |
-| `markdownLiveEditor.insertTable`    | Insert Table          | Вставить таблицу           |
-| `markdownLiveEditor.insertImage`    | Insert Image          | Вставить изображение       |
-| `markdownLiveEditor.exportHtml`     | Export as HTML        | Экспорт в HTML             |
-| `markdownLiveEditor.exportPdf`      | Export as PDF         | Экспорт в PDF              |
-| `markdownLiveEditor.showSource`     | Show Markdown Source  | Показать исходный Markdown |
-| `markdownLiveEditor.formatDocument` | Format Document       | Форматировать документ     |
+| `velvetMd.open`           | Open with Live Editor | Открыть файл в live-режиме |
+| `velvetMd.toggle`         | Toggle Preview Mode   | Переключить raw/live       |
+| `velvetMd.insertTable`    | Insert Table          | Вставить таблицу           |
+| `velvetMd.insertImage`    | Insert Image          | Вставить изображение       |
+| `velvetMd.exportHtml`     | Export as HTML        | Экспорт в HTML             |
+| `velvetMd.exportPdf`      | Export as PDF         | Экспорт в PDF              |
+| `velvetMd.showSource`     | Show Markdown Source  | Показать исходный Markdown |
+| `velvetMd.formatDocument` | Format Document       | Форматировать документ     |
 ---
 ## package.json (Extension Manifest)
 ```json
 {
-  "name": "markdown-live-editor",
-  "displayName": "Markdown Live Editor",
+  "name": "velvet-md",
+  "displayName": "Velvet MD",
   "description": "Obsidian-like live preview editor for Markdown",
   "version": "0.1.0",
   "publisher": "your-publisher",
@@ -265,14 +265,14 @@ markdown-live-editor/
   },
   "categories": ["Other"],
   "activationEvents": [
-    "onCustomEditor:markdownLiveEditor.editor"
+    "onCustomEditor:velvetMd.editor"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "customEditors": [
       {
-        "viewType": "markdownLiveEditor.editor",
-        "displayName": "Markdown Live Editor",
+        "viewType": "velvetMd.editor",
+        "displayName": "Velvet MD",
         "selector": [
           {
             "filenamePattern": "*.md"
@@ -283,46 +283,46 @@ markdown-live-editor/
     ],
     "commands": [
       {
-        "command": "markdownLiveEditor.open",
+        "command": "velvetMd.open",
         "title": "Open with Live Editor"
       },
       {
-        "command": "markdownLiveEditor.toggle",
+        "command": "velvetMd.toggle",
         "title": "Toggle Preview Mode"
       },
       {
-        "command": "markdownLiveEditor.insertTable",
+        "command": "velvetMd.insertTable",
         "title": "Insert Table"
       },
       {
-        "command": "markdownLiveEditor.insertImage",
+        "command": "velvetMd.insertImage",
         "title": "Insert Image"
       }
     ],
     "configuration": {
-      "title": "Markdown Live Editor",
+      "title": "Velvet MD",
       "properties": {
-        "markdownLiveEditor.defaultEditor": {
+        "velvetMd.defaultEditor": {
           "type": "boolean",
           "default": true,
           "description": "Use Live Editor as default for .md files"
         },
-        "markdownLiveEditor.showSyntaxOnFocus": {
+        "velvetMd.showSyntaxOnFocus": {
           "type": "boolean",
           "default": true,
           "description": "Show markdown syntax when element is focused"
         },
-        "markdownLiveEditor.editorWidth": {
+        "velvetMd.editorWidth": {
           "type": "string",
           "default": "800px",
           "description": "Editor width (px or %)"
         },
-        "markdownLiveEditor.autoSave": {
+        "velvetMd.autoSave": {
           "type": "boolean",
           "default": true,
           "description": "Auto-save changes"
         },
-        "markdownLiveEditor.autoSaveDelay": {
+        "velvetMd.autoSaveDelay": {
           "type": "number",
           "default": 1000,
           "description": "Auto-save delay in milliseconds"
@@ -331,16 +331,16 @@ markdown-live-editor/
     },
     "keybindings": [
       {
-        "command": "markdownLiveEditor.insertTable",
+        "command": "velvetMd.insertTable",
         "key": "ctrl+shift+t",
         "mac": "cmd+shift+t",
-        "when": "activeCustomEditorId == markdownLiveEditor.editor"
+        "when": "activeCustomEditorId == velvetMd.editor"
       },
       {
-        "command": "markdownLiveEditor.toggle",
+        "command": "velvetMd.toggle",
         "key": "ctrl+shift+p",
         "mac": "cmd+shift+p",
-        "when": "activeCustomEditorId == markdownLiveEditor.editor"
+        "when": "activeCustomEditorId == velvetMd.editor"
       }
     ]
   },
