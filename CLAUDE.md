@@ -15,7 +15,7 @@ VS Code extension providing Obsidian-like live preview editing for Markdown file
 # Install dependencies
 npm install
 
-# Type checking (run before commits)
+# Type checking (MUST pass before commits - zero errors required)
 npm run typecheck
 
 # Linting
@@ -33,49 +33,49 @@ npm run build
 
 ### Testing
 ```bash
-# Run all tests (requires VS Code test runner setup)
-npm test
-
 # Run specific test file with tsx (unit tests)
 npx tsx test/constants.test.ts
 npx tsx test/roundtrip.test.ts
+npx tsx test/link-image.test.ts
 
 # Run with coverage
 npm run test:coverage
 ```
 
-### Development Notes
-- The extension consists of **two separate webpack bundles**:
-  - `extension.js` (Node.js target) - VS Code extension host process
-  - `webview.js` (web target) - Browser environment for Tiptap editor
-- Always run `npm run typecheck` before commits (no errors allowed)
-- ESLint warnings are acceptable but must be justified
+**Important:** Always run `npm run typecheck` before commits. Zero errors required.
 
 ## Architecture
 
-### Dual-Bundle System
+### Dual-Bundle System (CRITICAL)
 
-This extension uses a **split build architecture** with two independent compilation targets:
+This extension uses a **split build architecture** with two independent webpack bundles:
 
 1. **Extension Bundle** (`src/extension.ts` → `dist/extension.js`)
-   - Target: Node.js
-   - Environment: VS Code Extension Host
-   - Entry: `src/extension.ts`
-   - Key components:
+   - **Target:** Node.js (`target: 'node'`)
+   - **Environment:** VS Code Extension Host process
+   - **Entry:** `src/extension.ts`
+   - **Config:** Main `tsconfig.json` (excludes webview files)
+   - **Key components:**
      - `MarkdownEditorProvider` - Custom editor implementation
      - Document synchronization logic
      - VS Code API integration
 
 2. **Webview Bundle** (`src/editor/webview/editor.ts` → `dist/webview.js`)
-   - Target: Web/Browser
-   - Environment: VS Code Webview (isolated iframe)
-   - Entry: `src/editor/webview/editor.ts`
-   - Key components:
+   - **Target:** Web/Browser (`target: 'web'`)
+   - **Environment:** VS Code Webview (isolated iframe/sandbox)
+   - **Entry:** `src/editor/webview/editor.ts`
+   - **Config:** `tsconfig.webview.json` (extends main, adds DOM types)
+   - **Key components:**
      - Tiptap editor initialization
      - Markdown ↔ Editor state conversion
      - Message-based communication with extension host
 
-**Critical:** Code in webview bundle cannot import Node.js modules or use VS Code API directly. Communication happens via `postMessage` API only.
+**CRITICAL:** Code in webview bundle **CANNOT**:
+- Import Node.js modules (fs, path, crypto, etc.)
+- Use VS Code API directly
+- Access file system
+
+Communication happens **ONLY** via `postMessage` API.
 
 ### Bidirectional Sync Architecture
 
@@ -89,18 +89,31 @@ MarkdownEditorProvider (extension host)
 Tiptap Editor (webview)
 ```
 
-**Key Components:**
+#### Critical Timing Constants
 
-#### 1. MarkdownEditorProvider (`src/providers/markdownEditorProvider.ts`)
-- Implements `vscode.CustomTextEditorProvider`
-- Manages document ↔ webview synchronization
-- **Critical timing constants:**
-  - `WEBVIEW_UPDATE_COOLDOWN_MS = 500` - Prevents echo loops after webview updates
-  - `DOCUMENT_CHANGE_DEBOUNCE_MS = 300` - Debounces external file changes
-- Tracks update sources (`webview` vs `external`) to prevent infinite loops
-- Uses `lastUpdates` Map to correlate document changes with their origin
+Located in `src/providers/markdownEditorProvider.ts`:
 
-#### 2. Message Protocol (`src/types.ts`)
+- **`WEBVIEW_UPDATE_COOLDOWN_MS = 500`**
+  - Prevents echo loops after webview updates
+  - Time window where document changes are assumed to originate from webview
+  - Accounts for VS Code workspace edit latency (~50-100ms) + safety margin
+  - Too low → update loops; too high → miss rapid external edits
+
+- **`DOCUMENT_CHANGE_DEBOUNCE_MS = 300`**
+  - Debounces external file changes to reduce update frequency
+  - Prevents excessive re-renders during rapid external edits (e.g., git operations)
+
+#### Update Flow Prevention Logic
+
+Uses `lastUpdates` Map to track update sources:
+- When webview sends update → mark as `source: 'webview'` with timestamp
+- When document change fires → check if within cooldown window
+- If within cooldown → assume echo, skip webview update
+- If outside cooldown → treat as external edit, send to webview
+
+### Message Protocol
+
+Defined in `src/types.ts`:
 
 **Extension → Webview:**
 - `DocumentChangedMessage` - File content updated externally
@@ -110,45 +123,47 @@ Tiptap Editor (webview)
 - `ReadyMessage` - Editor initialized successfully
 - `ErrorMessage` - Editor error occurred
 
-#### 3. Markdown Processing Pipeline
+### Markdown Processing Pipeline
 
-**Parsing (Markdown → Editor):**
-- `markdown-it` parses to intermediate format
+#### Parsing (Markdown → Editor)
 - Tiptap's `@tiptap/markdown` extension converts to ProseMirror schema
-- `src/utils/markdownParser.ts`:
-  - `preprocessMarkdown()` - Normalizes line endings, whitespace
-  - `validateMarkdown()` - Checks size limits (10MB), unmatched delimiters
-  - Security: `html: false` to prevent XSS
+- **Security:** Link extension validates URLs (`/^(https?:\/\/|mailto:)/`) to prevent `javascript:` attacks
+- **Size limit:** `MAX_CONTENT_SIZE_BYTES = 10MB` enforced in constants
 
-**Serialization (Editor → Markdown):**
-- Tiptap serializes ProseMirror state to markdown
-- `src/utils/markdownSerializer.ts`:
-  - `postprocessMarkdown()` - Removes `&nbsp;`, normalizes spacing
-  - `serializeMarkdown()` - Main entry point for webview output
-  - Ensures POSIX-compliant file endings (single trailing newline)
+#### Serialization (Editor → Markdown)
+Located in `src/utils/markdownSerializer.ts`:
 
-#### 4. Webview Editor (`src/editor/webview/editor.ts`)
+- `serializeMarkdown()` - Main entry point for webview output
+- `postprocessMarkdown()` - Removes `&nbsp;`, normalizes spacing
+- Ensures POSIX-compliant file endings (single trailing newline)
+
+**Important:** Raw Tiptap output may not preserve formatting perfectly. The `serializeMarkdown()` utility fixes these issues, which is why some round-trip tests are expected to fail (they test raw output).
+
+### Webview Editor
+
+Located in `src/editor/webview/editor.ts`:
+
 - Uses **factory pattern** to encapsulate mutable state
 - `createEditorManager()` returns `{ initialize, cleanup }` interface
 - **State management:**
   - Internal `EditorState` interface (mutable by design for lifecycle management)
+  - Contains DOM references (Editor instance, MessageHandler)
   - State isolated in closure, not exposed globally
 - **Update flow:**
-  - User edits → `onUpdate` callback → serialize → `postMessage('update')`
+  - User edits → `onUpdate` callback → `serializeMarkdown()` → `postMessage('update')`
   - Extension message → `handleDocumentChanged` → `setContent({ emitUpdate: false })`
 
-### Security Considerations
+### Security
 
 1. **Content Security Policy (CSP):**
+   - Located in `MarkdownEditorProvider.getHtmlForWebview()`
    - Strict CSP with cryptographic nonces (`crypto.randomBytes(16)`)
    - `default-src 'none'` - deny all by default
    - Scripts/styles only via nonce
-   - Located in: `MarkdownEditorProvider.getHtmlForWebview()`
 
 2. **XSS Prevention:**
-   - `markdown-it` configured with `html: false` (no raw HTML passthrough)
-   - All user content sanitized through markdown parser
-   - No `dangerouslySetInnerHTML` or equivalent
+   - Link extension validates URLs (no `javascript:` URIs)
+   - No raw HTML passthrough in markdown parser
 
 3. **Input Validation:**
    - `MAX_CONTENT_SIZE_BYTES = 10MB` enforced consistently
@@ -157,7 +172,7 @@ Tiptap Editor (webview)
 
 ### Configuration
 
-Extension settings (`package.json` → `contributes.configuration`):
+Extension settings in `package.json` → `contributes.configuration`:
 - `showSyntaxOnFocus` (boolean, default: true) - Show markdown syntax when editing
 - `autoReloadOnExternalChanges` (boolean, default: true) - Auto-reload on external edits
 - `virtualizationThreshold` (number, default: 512000) - Performance threshold for large files
@@ -166,22 +181,22 @@ Extension settings (`package.json` → `contributes.configuration`):
 
 **Extension Host (Node.js):**
 - `src/extension.ts` - Extension activation/deactivation
-- `src/providers/markdownEditorProvider.ts` - Custom editor provider (236 lines)
+- `src/providers/markdownEditorProvider.ts` - Custom editor provider (~236 lines)
 - `src/utils/debounce.ts` - Debouncing utility
 
 **Webview (Browser):**
-- `src/editor/webview/editor.ts` - Tiptap initialization and sync (150 lines)
+- `src/editor/webview/editor.ts` - Tiptap initialization and sync (~150 lines)
 - `media/webview/styles.css` - Editor styling
 
 **Utilities (Shared concepts, separate bundles):**
 - `src/constants.ts` - Centralized constants, `formatBytes()`
-- `src/utils/markdownParser.ts` - Markdown → AST (142 lines)
-- `src/utils/markdownSerializer.ts` - AST → Markdown (165 lines)
+- `src/utils/markdownSerializer.ts` - AST → Markdown (~165 lines)
 - `src/types.ts` - Message type definitions
 
 **Tests:**
 - `test/setup.ts` - JSDOM setup for testing Tiptap in Node.js
 - `test/roundtrip.test.ts` - Round-trip fidelity tests (26 test cases)
+- `test/link-image.test.ts` - Link and image handling tests
 - `test/constants.test.ts` - Utility function tests (14 tests)
 
 ### Testing Strategy
@@ -199,45 +214,20 @@ const result = editor.markdown.serialize(editor.getJSON());
 
 **Run tests:** `npx tsx test/<filename>.test.ts`
 
-### Quality Standards
-
-All code must pass:
-- **Linting:** `npm run lint` (0 errors, warnings justified)
-- **Type checking:** `npm run typecheck` (0 errors)
-- **Compilation:** `npm run compile` (must succeed)
-
-Code quality checklist (`.claude/QUALITY_CHECKLIST.md`):
-- Immutability: Use spread operators, avoid mutation
-- Function size: <50 lines per function
-- File size: <800 lines per file (prefer <400)
-- No `console.log` statements in production code
-- Security review required for user input handling
-
 ### Known Limitations
 
-1. **Round-trip Tests:** Some tests currently fail - this is expected during PoC phase. Tests verify that raw Tiptap output matches input, but actual implementation uses `serializeMarkdown()` utility which fixes these issues.
+1. **Round-trip Tests:** Some tests in `test/roundtrip.test.ts` currently fail - this is expected during PoC phase. Tests verify that raw Tiptap output matches input, but actual implementation uses `serializeMarkdown()` utility which fixes these issues.
 
 2. **Webview Bundle Size:** 398KB (exceeds webpack recommendation of 244KB) - acceptable for rich text editor with Tiptap dependencies.
 
 ### Development Workflow
 
 1. Make changes in `src/` directory
-2. Run `npm run typecheck` to verify types
+2. Run `npm run typecheck` to verify types (must pass)
 3. Run `npm run lint` to check code style
 4. Run `npm run compile` to build both bundles
 5. Test in VS Code Extension Host (F5 in VS Code)
 6. Run unit tests: `npx tsx test/<file>.test.ts`
-7. Follow quality checklist before commits
-
-### PRD Reference
-
-See `PRD.md` for detailed functional requirements:
-- FR-1: Live Preview Mode (syntax hiding on blur)
-- FR-2: Interactive table editing
-- FR-3: Table creation commands
-- FR-4: VS Code integration
-- NFR-1: Performance (500KB+ files with virtualization)
-- NFR-2: Accessibility (WCAG 2.1 AA)
 
 ### Debugging
 

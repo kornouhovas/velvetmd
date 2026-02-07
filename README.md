@@ -1,38 +1,172 @@
 # Velvet MD
+
 > Obsidian-like live preview editor for Markdown in VS Code
+
 ## Status
-🚧 **Project Status:** Pre-Development (PoC Phase)
+
+🚧 **Pre-Development (PoC Phase)** - v0.1.0-alpha
+
 ## Overview
-VS Code extension providing live preview editing for Markdown files with WYSIWYG-like interface, interactive table editing, and seamless syntax hiding.
-## Key Features (Planned)
-- ✨ Live preview mode with instant formatting
-- 📊 Interactive table editor with drag-and-drop
-- 🎯 Focus mode (show syntax only when editing)
-- ⚡ High performance (virtualization for large files)
-- 🎨 VS Code theme integration
-- ♿ WCAG 2.1 AA accessibility
-## Development Roadmap
-See [PRD.md](./PRD.md) for detailed product requirements.
-### Current Phase: Pre-Development
-PoC #1: Round-trip Markdown preservation
-- [ ] PoC #2: Performance baseline
-- [ ] PoC #3: VS Code integration
-- [ ] GO/NO-GO decision
-### Planned Phases
-1. **Phase 1:** Core Editor (2-3 weeks)
-2. **Phase 2:** Rich Editing (2 weeks)
-3. **Phase 3:** Advanced Tables & UX (1-2 weeks)
-4. **Phase 4:** Polish & Distribution (1-2 weeks)
+
+VS Code extension providing Obsidian-like live preview editing for Markdown files with WYSIWYG interface. Uses Tiptap (ProseMirror wrapper) with bidirectional synchronization between the editor and VS Code's text document model.
+
+## Key Features
+
+- ✨ **Live Preview Mode** - WYSIWYG editing with instant formatting
+- 🔄 **Bidirectional Sync** - Maintains round-trip fidelity between markdown text and editor state
+- 🎯 **Dual-Bundle Architecture** - Separate compilation targets for extension host and webview
+- 🔒 **Security** - Strict CSP with cryptographic nonces, XSS prevention
+- ⚡ **Performance** - Optimized for files up to 10MB with debounced updates
+
+## Architecture
+
+### Dual-Bundle System
+
+Two independent compilation targets:
+
+1. **Extension Bundle** (`dist/extension.js`)
+   - Target: Node.js
+   - Environment: VS Code Extension Host
+   - Manages document synchronization and VS Code API integration
+
+2. **Webview Bundle** (`dist/webview.js`)
+   - Target: Web/Browser
+   - Environment: VS Code Webview (isolated iframe)
+   - Handles Tiptap editor and message-based communication
+
+### Synchronization Flow
+
+```
+VS Code Document (plain text .md)
+        ↕ (debounced 300ms)
+MarkdownEditorProvider (extension host)
+        ↕ (postMessage)
+Tiptap Editor (webview)
+```
+
 ## Tech Stack
-- **Framework:** Tiptap (Prosemirror wrapper)
+
+- **Editor:** Tiptap (ProseMirror wrapper)
 - **Markdown Parser:** markdown-it
 - **Language:** TypeScript
-- **Platform:** VS Code Extension API
+- **Build:** Webpack (dual-bundle configuration)
+- **Testing:** Node.js test runner + JSDOM
+
+## Development
+
+### Prerequisites
+
+- VS Code 1.80+
+- Node.js 20+
+- npm
+
+### Commands
+
+```bash
+# Install dependencies
+npm install
+
+# Development with watch mode
+npm run watch
+
+# Type checking (required before commits)
+npm run typecheck
+
+# Linting
+npm run lint
+
+# Production build
+npm run compile
+
+# Full build pipeline
+npm run build
+
+# Run tests
+npx tsx test/<filename>.test.ts
+```
+
+### Project Structure
+
+```
+src/
+├── extension.ts                    # Extension entry point
+├── providers/
+│   └── markdownEditorProvider.ts   # Custom editor provider (236 lines)
+├── editor/
+│   └── webview/
+│       └── editor.ts               # Tiptap initialization (150 lines)
+├── utils/
+│   ├── markdownParser.ts           # Markdown → AST (142 lines)
+│   ├── markdownSerializer.ts       # AST → Markdown (165 lines)
+│   └── debounce.ts                 # Debouncing utility
+├── constants.ts                    # Centralized constants
+└── types.ts                        # Message protocol types
+
+test/
+├── setup.ts                        # JSDOM configuration
+├── roundtrip.test.ts               # Round-trip fidelity tests (26 cases)
+└── constants.test.ts               # Utility function tests (14 tests)
+
+media/
+└── webview/
+    └── styles.css                  # Editor styling
+```
+
+## Configuration
+
+Available settings (`package.json` → `contributes.configuration`):
+
+- `showSyntaxOnFocus` (boolean, default: true) - Show markdown syntax when editing
+- `autoReloadOnExternalChanges` (boolean, default: true) - Auto-reload on external edits
+- `virtualizationThreshold` (number, default: 512000) - Performance threshold for large files
+
+## Testing
+
+### Running Tests
+
+```bash
+# Round-trip conversion tests
+npx tsx test/roundtrip.test.ts
+
+# Utility function tests
+npx tsx test/constants.test.ts
+```
+
+Tests use Node.js built-in test runner with JSDOM for DOM simulation.
+
+## Quality Standards
+
+All code must pass:
+- ✅ **Type checking:** `npm run typecheck` (0 errors)
+- ✅ **Linting:** `npm run lint` (0 errors, warnings justified)
+- ✅ **Compilation:** `npm run compile` (must succeed)
+
+## Known Limitations
+
+1. **Round-trip Tests:** Some tests currently fail - this is expected during PoC phase. The actual implementation uses `serializeMarkdown()` utility which fixes these issues.
+
+2. **Webview Bundle Size:** 398KB (exceeds webpack recommendation of 244KB) - acceptable for rich text editor with Tiptap dependencies.
+
+## Debugging
+
+Extension logs available via:
+```typescript
+this.logger = vscode.window.createOutputChannel('Velvet MD');
+this.logger.appendLine('Debug message');
+```
+
+View logs: VS Code → Output panel → "Velvet MD"
+
 ## Documentation
-- [PRD.md](./PRD.md) - Product Requirements Document
-- [CHANGELOG.md](./CHANGELOG.md) - Version history (TBD)
-- [CONTRIBUTING.md](./CONTRIBUTING.md) - Contribution guidelines (TBD)
+
+- [CLAUDE.md](./CLAUDE.md) - Detailed architecture and development guide
+- [CHANGELOG.md](./CHANGELOG.md) - Version history
+
 ## License
-## TBD
+
+TBD
+
+---
+
 **Version:** 0.1.0-alpha
-**Last Updated:** 2026-01-3
+**Last Updated:** 2026-02-07
