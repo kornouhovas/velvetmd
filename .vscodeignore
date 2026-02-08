@@ -4,6 +4,7 @@ src/**
 .gitignore
 .eslintrc.json
 tsconfig.json
+tsconfig.webview.json
 webpack.config.js
 **/*.map
 **/*.ts
@@ -12,3 +13,8 @@ node_modules/**
 .DS_Store
 *.log
 out/**
+.venv/**
+.claude/**
+test/**
+Test2.md
+test-markdown-elements.md

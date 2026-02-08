@@ -94,6 +94,26 @@ npx tsx test/roundtrip.test.ts
 npx tsx test/link-image.test.ts
 ```
 
+### Building & Installation
+
+Package the extension into a `.vsix` file:
+
+```bash
+# Install vsce (VS Code Extension CLI)
+npm install -g @vscode/vsce
+
+# Package the extension
+vsce package
+```
+
+Install the generated `.vsix` file:
+
+```bash
+code --install-extension velvet-md-0.1.0.vsix
+```
+
+Or in VS Code: Extensions → `⋯` menu → "Install from VSIX..."
+
 ### Testing in VS Code
 
 1. Open this project in VS Code
