@@ -14,7 +14,21 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   );
 
-  context.subscriptions.push(registration);
+  const openWithVelvetCommand = vscode.commands.registerCommand(
+    'velvetMd.openWithVelvet',
+    async () => {
+      await vscode.commands.executeCommand('reopenActiveEditorWith', 'velvetMd.editor');
+    }
+  );
+
+  const openWithTextEditorCommand = vscode.commands.registerCommand(
+    'velvetMd.openWithTextEditor',
+    async () => {
+      await vscode.commands.executeCommand('workbench.action.reopenTextEditor');
+    }
+  );
+
+  context.subscriptions.push(registration, openWithVelvetCommand, openWithTextEditorCommand);
 }
 
 export function deactivate(): void {

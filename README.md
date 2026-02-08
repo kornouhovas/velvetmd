@@ -40,6 +40,15 @@ Or set Velvet MD as the default editor for Markdown files:
 3. Choose **"Velvet MD"**
 4. Click **"Configure default editor for '*.md'..."**
 
+### Switching Between Editors
+
+Toggle between Velvet MD and the standard Text Editor in the same tab:
+
+- **`$(book)` icon** - Click the book icon in the editor title bar when viewing a `.md` file in the Text Editor to switch to Velvet MD
+- **`$(code)` icon** - Click the code icon when in Velvet MD to switch back to the Text Editor
+
+Both buttons switch editors in-place without opening new tabs.
+
 ### Editing
 
 - Click anywhere to start editing

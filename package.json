@@ -20,6 +20,34 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "commands": [
+      {
+        "command": "velvetMd.openWithVelvet",
+        "title": "Open with Velvet MD",
+        "category": "Velvet MD",
+        "icon": "$(book)"
+      },
+      {
+        "command": "velvetMd.openWithTextEditor",
+        "title": "Open with Text Editor",
+        "category": "Velvet MD",
+        "icon": "$(code)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "velvetMd.openWithVelvet",
+          "when": "resourceLangId == markdown && activeCustomEditorId != velvetMd.editor",
+          "group": "navigation"
+        },
+        {
+          "command": "velvetMd.openWithTextEditor",
+          "when": "activeCustomEditorId == velvetMd.editor",
+          "group": "navigation"
+        }
+      ]
+    },
     "customEditors": [
       {
         "viewType": "velvetMd.editor",
