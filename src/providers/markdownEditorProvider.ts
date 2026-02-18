@@ -3,6 +3,7 @@ import * as crypto from 'crypto';
 import { debounce } from '../utils/debounce';
 import { WebviewMessage, ConfigMessage, ScrollSyncMessage } from '../types';
 import { MAX_CONTENT_SIZE_BYTES, formatBytes } from '../constants';
+import { isWithinCooldown, isEchoContent } from '../utils/providerUtils';
 
 interface UpdateMetadata {
   source: 'webview' | 'external';
@@ -235,7 +236,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       const lastUpdate = this.lastUpdates.get(doc.uri.toString());
       if (lastUpdate?.source === 'webview') {
         const timeSinceUpdate = Date.now() - lastUpdate.timestamp;
-        if (timeSinceUpdate < MarkdownEditorProvider.WEBVIEW_UPDATE_COOLDOWN_MS) {
+        if (isWithinCooldown(lastUpdate.timestamp, Date.now(), MarkdownEditorProvider.WEBVIEW_UPDATE_COOLDOWN_MS)) {
           this.log(
             'INFO',
             `Skipping update - came from webview (${timeSinceUpdate}ms ago)`
@@ -247,7 +248,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
 
       // Cooldown expired - check if content matches last webview update (slow echo)
       const lastContent = this.lastWebviewContent.get(doc.uri.toString());
-      if (lastContent === doc.getText()) {
+      if (isEchoContent(doc.getText(), lastContent)) {
         this.log(
           'INFO',
           'Skipping update - content matches last webview update (slow echo)'
