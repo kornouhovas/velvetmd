@@ -62,8 +62,9 @@ describe('lineToScrollState', () => {
   });
 
   // AT-SC-011
-  test('AT-SC-011: middle line → scrollTop=50% of scrollableHeight', () => {
-    assert.strictEqual(lineToScrollState(50, 101, 2000, 800), 600);
+  test('AT-SC-011: middle line → scrollTop places line at top of viewport', () => {
+    // line 50 of 101 starts at (50/101)*2000 ≈ 990px → scrollTop=990 puts it at top
+    assert.strictEqual(lineToScrollState(50, 101, 2000, 800), 990);
   });
 
   // AT-SC-012
@@ -86,11 +87,10 @@ describe('lineToScrollState', () => {
     assert.strictEqual(lineToScrollState(200, 100, 2000, 800), 1200);
   });
 
-  // AT-SC-016: round-trip
-  test('AT-SC-016: round-trip: scrollStateToLine(lineToScrollState(line)) ≈ line', () => {
-    const line = 42;
-    const scrollTop = lineToScrollState(line, 100, 2000, 800);
-    const recovered = scrollStateToLine(scrollTop, 2000, 800, 100);
-    assert.strictEqual(recovered, line);
+  // AT-SC-016: "put at top" semantic
+  test('AT-SC-016: line N is placed at the top of the viewport', () => {
+    // 100 lines, scrollHeight=2000 → each line ~20px; line 42 starts at 42*20=840px
+    // scrollTop=840 puts line 42 exactly at the top of the viewport
+    assert.strictEqual(lineToScrollState(42, 100, 2000, 800), 840);
   });
 });

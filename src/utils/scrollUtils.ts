@@ -1,8 +1,10 @@
 /**
  * Converts a target line number to a webview scrollTop offset.
  *
- * Inverse of scrollStateToLine. Maps a 0-based line index to the
- * pixel offset needed to restore an equivalent scroll position.
+ * Places the target line at the TOP of the viewport by computing
+ * its pixel position within the document and using that as scrollTop.
+ * The result is clamped to [0, scrollableHeight] so the viewport
+ * never scrolls past the end of the document.
  *
  * @param line           - Target line index (0-based)
  * @param totalLines     - Total number of lines in the document
@@ -16,14 +18,12 @@ export function lineToScrollState(
   scrollHeight: number,
   viewportHeight: number
 ): number {
-  if (totalLines <= 1) { return 0; }
+  if (totalLines <= 0) { return 0; }
 
   const scrollableHeight = Math.max(scrollHeight - viewportHeight, 0);
-  if (scrollableHeight === 0) { return 0; }
-
-  const maxLine = totalLines - 1;
-  const linePercent = Math.max(0, Math.min(line / maxLine, 1));
-  return Math.round(linePercent * scrollableHeight);
+  const clampedLine = Math.max(0, line);
+  const rawScrollTop = Math.round((clampedLine / totalLines) * scrollHeight);
+  return Math.min(rawScrollTop, scrollableHeight);
 }
 
 /**
