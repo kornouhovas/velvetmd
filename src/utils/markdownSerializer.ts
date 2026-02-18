@@ -10,7 +10,6 @@
  *
  * Handles edge cases and normalizes output:
  * - Removes trailing &nbsp; entities
- * - Normalizes excessive blank lines
  * - Ensures consistent line endings
  */
 export function postprocessMarkdown(markdown: string): string {
@@ -31,9 +30,6 @@ export function postprocessMarkdown(markdown: string): string {
 
   // Remove trailing whitespace from lines
   processed = processed.replace(/[ \t]+$/gm, '');
-
-  // Normalize excessive blank lines (more than 2 → 2)
-  processed = processed.replace(/\n{4,}/g, '\n\n\n');
 
   // Remove leading/trailing whitespace but preserve single trailing newline (POSIX convention)
   processed = processed.trim();

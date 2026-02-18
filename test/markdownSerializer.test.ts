@@ -20,8 +20,8 @@ describe('postprocessMarkdown', () => {
     assert.strictEqual(postprocessMarkdown('hello   \nworld'), 'hello\nworld\n');
   });
 
-  test('collapses 4+ consecutive newlines to 3', () => {
-    assert.strictEqual(postprocessMarkdown('a\n\n\n\nb'), 'a\n\n\nb\n');
+  test('does not collapse excessive newlines (delegated to normalizeMarkdownWhitespace)', () => {
+    assert.strictEqual(postprocessMarkdown('a\n\n\n\nb'), 'a\n\n\n\nb\n');
   });
 
   test('adds POSIX trailing newline', () => {
@@ -45,6 +45,10 @@ describe('normalizeMarkdownWhitespace', () => {
 
   test('returns empty string for empty/invalid input', () => {
     assert.strictEqual(normalizeMarkdownWhitespace(''), '');
+  });
+
+  test('returns whitespace-only input unchanged (guard does not trim)', () => {
+    assert.strictEqual(normalizeMarkdownWhitespace('   '), '   ');
   });
 });
 
