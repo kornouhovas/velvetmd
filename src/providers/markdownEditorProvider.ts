@@ -132,6 +132,9 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
           this.log('ERROR', `Webview error: ${message.message}`);
           vscode.window.showErrorMessage(`Velvet MD: ${message.message}`);
           break;
+        case 'scrollSync':
+          // Scroll state tracking — handled in Task 3
+          break;
         default:
           this.log('WARN', 'Unknown message type');
       }
