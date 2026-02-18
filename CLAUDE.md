@@ -1,3 +1,4 @@
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -6,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 VS Code extension providing Obsidian-like live preview editing for Markdown files with WYSIWYG interface. Uses Tiptap (ProseMirror wrapper) with bidirectional sync between the editor and VS Code's text document model.
 
-**Current Status:** Pre-Development (PoC Phase) - v0.1.0-alpha
+**Current Status:** Early Development - v0.2.0
 
 ## Commands
 

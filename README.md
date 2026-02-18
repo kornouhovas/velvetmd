@@ -4,9 +4,9 @@
 
 ## Status
 
-🚧 **Pre-Development (PoC Phase)** - v0.1.0-alpha
+🚧 **Early Development** - v0.2.0
 
-This extension is in early development. Features and API may change.
+This extension is in active development. Features and API may change.
 
 ## Features
 
@@ -24,6 +24,7 @@ This extension is in early development. Features and API may change.
   - Horizontal rules
   - Ordered and unordered lists
 - **Bidirectional Sync** - Changes sync seamlessly between the editor and file system
+- **Scroll Position Sync** - Scroll position is preserved when switching between Velvet MD and Text Editor
 - **Focus Mode** - Show markdown syntax only when editing a block
 - **Large File Support** - Optimized for files up to 10MB
 
@@ -101,6 +102,9 @@ npm run build
 npx tsx test/constants.test.ts
 npx tsx test/roundtrip.test.ts
 npx tsx test/link-image.test.ts
+npx tsx test/scrollUtils.test.ts
+npx tsx test/providerUtils.test.ts
+npx tsx test/markdownSerializer.test.ts
 ```
 
 ### Building & Installation
@@ -118,7 +122,7 @@ vsce package
 Install the generated `.vsix` file:
 
 ```bash
-code --install-extension velvet-md-0.1.0.vsix
+code --install-extension velvet-md-0.2.0.vsix
 ```
 
 Or in VS Code: Extensions → `⋯` menu → "Install from VSIX..."
@@ -132,6 +136,7 @@ Or in VS Code: Extensions → `⋯` menu → "Install from VSIX..."
 
 ## Documentation
 
+- [CHANGELOG.md](./CHANGELOG.md) - Release history
 - [CLAUDE.md](./CLAUDE.md) - Architecture and implementation details
 
 ## License
