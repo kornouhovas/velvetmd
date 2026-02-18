@@ -1,5 +1,9 @@
 /**
- * Unit tests for scrollUtils — AT-SC-001..AT-SC-008
+ * Unit tests for scrollUtils — AT-SC-001..AT-SC-016
+ *
+ * Both functions share the same model:
+ *   line N is at pixel (N / totalLines) × scrollHeight
+ *   pixel P corresponds to line (P / scrollHeight) × totalLines
  */
 import { test, describe } from 'node:test';
 import * as assert from 'node:assert/strict';
@@ -12,15 +16,15 @@ describe('scrollStateToLine', () => {
   });
 
   // AT-SC-002
-  test('AT-SC-002: scrollTop=max → last line', () => {
-    // scrollableHeight = 2000 - 800 = 1200; scrollPercent = 1200/1200 = 1; line = 99
-    assert.strictEqual(scrollStateToLine(1200, 2000, 800, 100), 99);
+  test('AT-SC-002: scrollTop=max → top visible line when fully scrolled', () => {
+    // scrollableHeight = 1200; (1200/2000)*100 = 60
+    assert.strictEqual(scrollStateToLine(1200, 2000, 800, 100), 60);
   });
 
   // AT-SC-003
-  test('AT-SC-003: scrollTop=50% → middle line', () => {
-    // scrollableHeight = 1200; 600/1200 = 0.5; line = round(0.5 * 100) = 50
-    assert.strictEqual(scrollStateToLine(600, 2000, 800, 101), 50);
+  test('AT-SC-003: scrollTop=600 → line at that document position', () => {
+    // (600/2000)*101 = 30.3 → round = 30
+    assert.strictEqual(scrollStateToLine(600, 2000, 800, 101), 30);
   });
 
   // AT-SC-004
@@ -39,9 +43,9 @@ describe('scrollStateToLine', () => {
   });
 
   // AT-SC-007
-  test('AT-SC-007: scrollTop > scrollableHeight (clamped to last line)', () => {
-    // scrollableHeight = 1200; scrollTop = 2000 → percent = 1 (clamped); line = 99
-    assert.strictEqual(scrollStateToLine(2000, 2000, 800, 100), 99);
+  test('AT-SC-007: scrollTop > scrollableHeight → clamped to max scroll position', () => {
+    // clamped to 1200; (1200/2000)*100 = 60
+    assert.strictEqual(scrollStateToLine(2000, 2000, 800, 100), 60);
   });
 
   // AT-SC-008
@@ -57,13 +61,13 @@ describe('lineToScrollState', () => {
   });
 
   // AT-SC-010
-  test('AT-SC-010: last line → scrollTop=scrollableHeight', () => {
+  test('AT-SC-010: last line → scrollTop clamped to scrollableHeight', () => {
     assert.strictEqual(lineToScrollState(99, 100, 2000, 800), 1200);
   });
 
   // AT-SC-011
   test('AT-SC-011: middle line → scrollTop places line at top of viewport', () => {
-    // line 50 of 101 starts at (50/101)*2000 ≈ 990px → scrollTop=990 puts it at top
+    // line 50 of 101 starts at (50/101)*2000 ≈ 990px
     assert.strictEqual(lineToScrollState(50, 101, 2000, 800), 990);
   });
 
@@ -87,10 +91,12 @@ describe('lineToScrollState', () => {
     assert.strictEqual(lineToScrollState(200, 100, 2000, 800), 1200);
   });
 
-  // AT-SC-016: "put at top" semantic
-  test('AT-SC-016: line N is placed at the top of the viewport', () => {
-    // 100 lines, scrollHeight=2000 → each line ~20px; line 42 starts at 42*20=840px
-    // scrollTop=840 puts line 42 exactly at the top of the viewport
-    assert.strictEqual(lineToScrollState(42, 100, 2000, 800), 840);
+  // AT-SC-016: round-trip
+  test('AT-SC-016: round-trip: scrollStateToLine ∘ lineToScrollState = identity', () => {
+    const line = 42;
+    const scrollTop = lineToScrollState(line, 100, 2000, 800);
+    assert.strictEqual(scrollTop, 840);
+    const recovered = scrollStateToLine(scrollTop, 2000, 800, 100);
+    assert.strictEqual(recovered, line);
   });
 });

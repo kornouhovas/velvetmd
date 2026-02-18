@@ -29,6 +29,9 @@ export function lineToScrollState(
 /**
  * Converts webview scroll state to a target line number in the text editor.
  *
+ * Inverse of lineToScrollState. Both share the same model:
+ *   line N is at pixel (N / totalLines) × scrollHeight
+ *
  * @param scrollTop     - Current scroll offset (px) from top of webview
  * @param scrollHeight  - Total scrollable height (px) of webview document
  * @param viewportHeight - Visible viewport height (px)
@@ -41,12 +44,9 @@ export function scrollStateToLine(
   viewportHeight: number,
   totalLines: number
 ): number {
-  if (totalLines <= 0) { return 0; }
+  if (totalLines <= 0 || scrollHeight <= 0) { return 0; }
 
   const scrollableHeight = Math.max(scrollHeight - viewportHeight, 0);
-  if (scrollableHeight === 0) { return 0; }
-
-  const scrollPercent = Math.max(0, Math.min(scrollTop / scrollableHeight, 1));
-  const maxLine = Math.max(0, totalLines - 1);
-  return Math.min(Math.round(scrollPercent * maxLine), maxLine);
+  const clampedScrollTop = Math.max(0, Math.min(scrollTop, scrollableHeight));
+  return Math.min(Math.round((clampedScrollTop / scrollHeight) * totalLines), totalLines - 1);
 }
