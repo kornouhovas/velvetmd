@@ -1,13 +1,4 @@
 /**
- * Converts webview scroll state to a target line number in the text editor.
- *
- * @param scrollTop     - Current scroll offset (px) from top of webview
- * @param scrollHeight  - Total scrollable height (px) of webview document
- * @param viewportHeight - Visible viewport height (px)
- * @param totalLines    - Total number of lines in the document
- * @returns Target line index (0-based), clamped to [0, totalLines-1]
- */
-/**
  * Converts a target line number to a webview scrollTop offset.
  *
  * Inverse of scrollStateToLine. Maps a 0-based line index to the
@@ -35,6 +26,15 @@ export function lineToScrollState(
   return Math.round(linePercent * scrollableHeight);
 }
 
+/**
+ * Converts webview scroll state to a target line number in the text editor.
+ *
+ * @param scrollTop     - Current scroll offset (px) from top of webview
+ * @param scrollHeight  - Total scrollable height (px) of webview document
+ * @param viewportHeight - Visible viewport height (px)
+ * @param totalLines    - Total number of lines in the document
+ * @returns Target line index (0-based), clamped to [0, totalLines-1]
+ */
 export function scrollStateToLine(
   scrollTop: number,
   scrollHeight: number,

@@ -167,14 +167,10 @@ function setupMessageListener(state: EditorState): void {
         state.showSyntaxOnFocus = message.showSyntaxOnFocus;
         break;
       case 'scrollRestoreLine': {
-        const el = document.documentElement;
-        const scrollTop = lineToScrollState(
-          message.line,
-          message.totalLines,
-          el.scrollHeight,
-          el.clientHeight
-        );
+        const { line, totalLines } = message;
         requestAnimationFrame(() => {
+          const el = document.documentElement;
+          const scrollTop = lineToScrollState(line, totalLines, el.scrollHeight, el.clientHeight);
           window.scrollTo({ top: scrollTop, behavior: 'instant' });
         });
         break;
