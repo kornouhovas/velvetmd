@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import { debounce } from '../utils/debounce';
-import { WebviewMessage, ConfigMessage } from '../types';
+import { WebviewMessage, ConfigMessage, ScrollSyncMessage } from '../types';
 import { MAX_CONTENT_SIZE_BYTES, formatBytes } from '../constants';
 
 interface UpdateMetadata {
@@ -33,11 +33,17 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
 
   private readonly lastUpdates = new Map<string, UpdateMetadata>();
   private readonly lastWebviewContent = new Map<string, string>();
+  private readonly lastScrollTop = new Map<string, number>();
+  private readonly pendingScrollLines = new Map<string, number>();
   private readonly logger: vscode.OutputChannel;
 
   constructor(private readonly context: vscode.ExtensionContext) {
     this.logger = vscode.window.createOutputChannel('Velvet MD');
     context.subscriptions.push(this.logger);
+  }
+
+  public setPendingScrollLine(uri: string, line: number): void {
+    this.pendingScrollLines.set(uri, line);
   }
 
   public async resolveCustomTextEditor(
@@ -82,6 +88,8 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         cancelDebounce();
         this.lastUpdates.delete(document.uri.toString());
         this.lastWebviewContent.delete(document.uri.toString());
+        this.lastScrollTop.delete(document.uri.toString());
+        this.pendingScrollLines.delete(document.uri.toString());
         this.log('INFO', `Editor disposed for: ${document.uri.fsPath}`);
       });
 
@@ -127,14 +135,34 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         case 'ready':
           this.log('INFO', 'Webview ready');
           this.sendDocumentToWebview(document, webview);
+          this.sendConfigToWebview(webview);
+          {
+            const pendingLine = this.pendingScrollLines.get(document.uri.toString());
+            if (pendingLine !== undefined) {
+              this.pendingScrollLines.delete(document.uri.toString());
+              webview.postMessage({
+                type: 'scrollRestoreLine',
+                line: pendingLine,
+                totalLines: document.lineCount
+              });
+            }
+          }
           break;
         case 'error':
           this.log('ERROR', `Webview error: ${message.message}`);
           vscode.window.showErrorMessage(`Velvet MD: ${message.message}`);
           break;
-        case 'scrollSync':
-          // Scroll state tracking — handled in Task 3
+        case 'scrollSync': {
+          const msg = message as ScrollSyncMessage;
+          if (
+            typeof msg.scrollTop === 'number' &&
+            typeof msg.scrollHeight === 'number' &&
+            typeof msg.viewportHeight === 'number'
+          ) {
+            this.lastScrollTop.set(document.uri.toString(), msg.scrollTop);
+          }
           break;
+        }
         default:
           this.log('WARN', 'Unknown message type');
       }
@@ -258,9 +286,11 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     document: vscode.TextDocument,
     webview: vscode.Webview
   ): void {
+    const scrollTop = this.lastScrollTop.get(document.uri.toString());
     webview.postMessage({
       type: 'documentChanged',
-      content: document.getText()
+      content: document.getText(),
+      ...(scrollTop !== undefined ? { scrollTop } : {})
     });
   }
 

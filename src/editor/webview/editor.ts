@@ -12,6 +12,7 @@ import TaskItem from '@tiptap/extension-task-item';
 import type { ExtensionMessage } from '../../types';
 import { serializeMarkdown } from '../../utils/markdownSerializer';
 import { MAX_CONTENT_SIZE_BYTES, formatBytes } from '../../constants';
+import { lineToScrollState } from '../../utils/scrollUtils';
 
 declare function acquireVsCodeApi(): {
   postMessage(message: unknown): void;
@@ -30,6 +31,7 @@ interface EditorState {
   editor: Editor | null;
   messageHandler: ((event: MessageEvent<ExtensionMessage>) => void) | null;
   showSyntaxOnFocus: boolean;
+  scrollCleanup: (() => void) | null;
 }
 
 /**
@@ -154,13 +156,29 @@ function setupMessageListener(state: EditorState): void {
     switch (message.type) {
       case 'documentChanged':
         handleDocumentChanged(state, message.content);
+        if (typeof message.scrollTop === 'number') {
+          const scrollTop = message.scrollTop;
+          requestAnimationFrame(() => {
+            window.scrollTo({ top: scrollTop, behavior: 'instant' });
+          });
+        }
         break;
       case 'config':
         state.showSyntaxOnFocus = message.showSyntaxOnFocus;
         break;
-      case 'scrollRestoreLine':
-        // Handled in Task 3
+      case 'scrollRestoreLine': {
+        const el = document.documentElement;
+        const scrollTop = lineToScrollState(
+          message.line,
+          message.totalLines,
+          el.scrollHeight,
+          el.clientHeight
+        );
+        requestAnimationFrame(() => {
+          window.scrollTo({ top: scrollTop, behavior: 'instant' });
+        });
         break;
+      }
       default:
         break;
     }
@@ -168,6 +186,37 @@ function setupMessageListener(state: EditorState): void {
 
   state.messageHandler = handler;
   window.addEventListener('message', handler);
+}
+
+/**
+ * Sets up a throttled scroll listener that reports scroll position to the extension.
+ * Returns a cleanup function.
+ */
+function setupScrollSync(): () => void {
+  let throttleTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const onScroll = () => {
+    if (throttleTimer !== null) { return; }
+    throttleTimer = setTimeout(() => {
+      throttleTimer = null;
+      const el = document.documentElement;
+      vscode.postMessage({
+        type: 'scrollSync',
+        scrollTop: el.scrollTop,
+        scrollHeight: el.scrollHeight,
+        viewportHeight: el.clientHeight
+      });
+    }, 100);
+  };
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+  return () => {
+    window.removeEventListener('scroll', onScroll);
+    if (throttleTimer !== null) {
+      clearTimeout(throttleTimer);
+      throttleTimer = null;
+    }
+  };
 }
 
 /**
@@ -186,6 +235,7 @@ function initializeEditor(state: EditorState): void {
 
     state.editor = createTiptapEditor(editorElement);
     setupMessageListener(state);
+    state.scrollCleanup = setupScrollSync();
     vscode.postMessage({ type: 'ready' });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown initialization error';
@@ -200,6 +250,10 @@ function initializeEditor(state: EditorState): void {
  * Cleans up editor resources
  */
 function cleanupEditor(state: EditorState): void {
+  if (state.scrollCleanup) {
+    state.scrollCleanup();
+    state.scrollCleanup = null;
+  }
   if (state.messageHandler) {
     window.removeEventListener('message', state.messageHandler);
     state.messageHandler = null;
@@ -217,7 +271,8 @@ function createEditorManager() {
   const state: EditorState = {
     editor: null,
     messageHandler: null,
-    showSyntaxOnFocus: true
+    showSyntaxOnFocus: true,
+    scrollCleanup: null
   };
 
   return {

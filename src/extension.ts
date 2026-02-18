@@ -17,6 +17,11 @@ export function activate(context: vscode.ExtensionContext): void {
   const openWithVelvetCommand = vscode.commands.registerCommand(
     'velvetMd.openWithVelvet',
     async () => {
+      const textEditor = vscode.window.activeTextEditor;
+      if (textEditor) {
+        const line = textEditor.visibleRanges[0]?.start.line ?? 0;
+        provider.setPendingScrollLine(textEditor.document.uri.toString(), line);
+      }
       await vscode.commands.executeCommand('reopenActiveEditorWith', 'velvetMd.editor');
     }
   );
