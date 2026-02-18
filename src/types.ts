@@ -2,6 +2,16 @@
  * Message types for communication between extension and webview
  */
 
+/**
+ * Full scroll state captured from the webview.
+ * Required for bidirectional conversion: scrollTop ↔ line number.
+ */
+export interface ScrollState {
+  scrollTop: number;
+  scrollHeight: number;
+  viewportHeight: number;
+}
+
 // Webview → Extension
 export interface UpdateMessage {
   type: 'update';

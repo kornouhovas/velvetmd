@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import { debounce } from '../utils/debounce';
-import { WebviewMessage, ConfigMessage, ScrollSyncMessage } from '../types';
+import { WebviewMessage, ConfigMessage, ScrollSyncMessage, ScrollState } from '../types';
 import { MAX_CONTENT_SIZE_BYTES, formatBytes } from '../constants';
 import { isWithinCooldown, isEchoContent } from '../utils/providerUtils';
 
@@ -34,7 +34,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
 
   private readonly lastUpdates = new Map<string, UpdateMetadata>();
   private readonly lastWebviewContent = new Map<string, string>();
-  private readonly lastScrollTop = new Map<string, number>();
+  private readonly lastScrollState = new Map<string, ScrollState>();
   private readonly pendingScrollLines = new Map<string, number>();
   private readonly logger: vscode.OutputChannel;
 
@@ -45,6 +45,10 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
 
   public setPendingScrollLine(uri: string, line: number): void {
     this.pendingScrollLines.set(uri, line);
+  }
+
+  public getLastScrollState(uri: string): ScrollState | undefined {
+    return this.lastScrollState.get(uri);
   }
 
   public async resolveCustomTextEditor(
@@ -89,7 +93,7 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         cancelDebounce();
         this.lastUpdates.delete(document.uri.toString());
         this.lastWebviewContent.delete(document.uri.toString());
-        this.lastScrollTop.delete(document.uri.toString());
+        this.lastScrollState.delete(document.uri.toString());
         this.pendingScrollLines.delete(document.uri.toString());
         this.log('INFO', `Editor disposed for: ${document.uri.fsPath}`);
       });
@@ -160,7 +164,11 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
             typeof msg.scrollHeight === 'number' &&
             typeof msg.viewportHeight === 'number'
           ) {
-            this.lastScrollTop.set(document.uri.toString(), msg.scrollTop);
+            this.lastScrollState.set(document.uri.toString(), {
+              scrollTop: msg.scrollTop,
+              scrollHeight: msg.scrollHeight,
+              viewportHeight: msg.viewportHeight
+            });
           }
           break;
         }
@@ -287,11 +295,11 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
     document: vscode.TextDocument,
     webview: vscode.Webview
   ): void {
-    const scrollTop = this.lastScrollTop.get(document.uri.toString());
+    const scrollState = this.lastScrollState.get(document.uri.toString());
     webview.postMessage({
       type: 'documentChanged',
       content: document.getText(),
-      ...(scrollTop !== undefined ? { scrollTop } : {})
+      ...(scrollState !== undefined ? { scrollTop: scrollState.scrollTop } : {})
     });
   }
 
