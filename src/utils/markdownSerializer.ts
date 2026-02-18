@@ -47,28 +47,16 @@ export function postprocessMarkdown(markdown: string): string {
 /**
  * Normalize markdown whitespace
  *
- * Ensures consistent whitespace handling:
- * - Single blank line between paragraphs
- * - No trailing whitespace
- * - Consistent indentation
+ * Ensures consistent paragraph spacing:
+ * - At most one blank line between paragraphs (collapses 3+ consecutive newlines to 2)
  */
 export function normalizeMarkdownWhitespace(markdown: string): string {
   if (!markdown || typeof markdown !== 'string') {
     return '';
   }
 
-  let normalized = markdown;
-
-  // Normalize line endings
-  normalized = normalized.replace(/\r\n/g, '\n');
-
-  // Remove trailing whitespace from lines (except hard breaks: two spaces at end)
-  normalized = normalized.replace(/(?<! {2})\s+$/gm, '');
-
-  // Normalize paragraph spacing (ensure single blank line between paragraphs)
-  normalized = normalized.replace(/\n{3,}/g, '\n\n');
-
-  return normalized;
+  // Normalize paragraph spacing (ensure max one blank line between paragraphs)
+  return markdown.replace(/\n{3,}/g, '\n\n');
 }
 
 /**
