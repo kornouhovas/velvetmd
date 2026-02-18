@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import { debounce } from '../utils/debounce';
-import { WebviewMessage } from '../types';
+import { WebviewMessage, ConfigMessage } from '../types';
 import { MAX_CONTENT_SIZE_BYTES, formatBytes } from '../constants';
 
 interface UpdateMetadata {
@@ -67,10 +67,18 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         webviewPanel
       );
 
+      // Re-send config when VS Code settings change
+      const configSubscription = vscode.workspace.onDidChangeConfiguration(e => {
+        if (e.affectsConfiguration('velvetMd')) {
+          this.sendConfigToWebview(webviewPanel.webview);
+        }
+      });
+
       // Cleanup on disposal
       webviewPanel.onDidDispose(() => {
         messageSubscription.dispose();
         changeSubscription.dispose();
+        configSubscription.dispose();
         cancelDebounce();
         this.lastUpdates.delete(document.uri.toString());
         this.lastWebviewContent.delete(document.uri.toString());
@@ -79,6 +87,9 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
 
       // Send initial content to webview
       this.sendDocumentToWebview(document, webviewPanel.webview);
+
+      // Send initial config
+      this.sendConfigToWebview(webviewPanel.webview);
 
       this.log('INFO', `Editor opened for: ${document.uri.fsPath}`);
     } catch (error) {
@@ -132,12 +143,30 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       typeof message === 'object' &&
       message !== null &&
       'type' in message &&
-      (message.type === 'update' || message.type === 'ready' || message.type === 'error')
+      (
+        message.type === 'update' ||
+        message.type === 'ready' ||
+        message.type === 'error' ||
+        message.type === 'scrollSync'
+      )
     );
   }
 
   private log(level: 'INFO' | 'WARN' | 'ERROR', message: string): void {
     this.logger.appendLine(`[${new Date().toISOString()}] [${level}] ${message}`);
+  }
+
+  private getConfig(): { autoReloadOnExternalChanges: boolean; showSyntaxOnFocus: boolean } {
+    const cfg = vscode.workspace.getConfiguration('velvetMd');
+    return {
+      autoReloadOnExternalChanges: cfg.get('autoReloadOnExternalChanges', true),
+      showSyntaxOnFocus: cfg.get('showSyntaxOnFocus', true)
+    };
+  }
+
+  private sendConfigToWebview(webview: vscode.Webview): void {
+    const { showSyntaxOnFocus } = this.getConfig();
+    webview.postMessage({ type: 'config', showSyntaxOnFocus } satisfies ConfigMessage);
   }
 
   private async handleWebviewUpdate(
@@ -200,6 +229,12 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
       // Genuine external change
       this.lastUpdates.delete(doc.uri.toString());
       this.lastWebviewContent.delete(doc.uri.toString());
+
+      if (!this.getConfig().autoReloadOnExternalChanges) {
+        this.log('INFO', 'autoReloadOnExternalChanges disabled, skipping reload');
+        return;
+      }
+
       this.log('INFO', 'External change detected, updating webview');
       this.sendDocumentToWebview(doc, webviewPanel.webview);
     }, MarkdownEditorProvider.DOCUMENT_CHANGE_DEBOUNCE_MS);

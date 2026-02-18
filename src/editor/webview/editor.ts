@@ -29,6 +29,7 @@ const vscode = acquireVsCodeApi();
 interface EditorState {
   editor: Editor | null;
   messageHandler: ((event: MessageEvent<ExtensionMessage>) => void) | null;
+  showSyntaxOnFocus: boolean;
 }
 
 /**
@@ -154,6 +155,12 @@ function setupMessageListener(state: EditorState): void {
       case 'documentChanged':
         handleDocumentChanged(state, message.content);
         break;
+      case 'config':
+        state.showSyntaxOnFocus = message.showSyntaxOnFocus;
+        break;
+      case 'scrollRestoreLine':
+        // Handled in Task 3
+        break;
       default:
         break;
     }
@@ -209,7 +216,8 @@ function cleanupEditor(state: EditorState): void {
 function createEditorManager() {
   const state: EditorState = {
     editor: null,
-    messageHandler: null
+    messageHandler: null,
+    showSyntaxOnFocus: true
   };
 
   return {
