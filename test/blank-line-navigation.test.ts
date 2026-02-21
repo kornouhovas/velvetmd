@@ -113,12 +113,12 @@ describe('Blank line navigation fix', () => {
       assert.equal(cleaned, 'Para 1\n\nPara 2\n', `Round-trip failed: got ${JSON.stringify(cleaned)}`);
     });
 
-    it('round-trips "A\\n\\n\\nB\\n" (2 blank lines → normalized to 1)', () => {
+    it('round-trips "A\\n\\n\\nB\\n" (2 blank lines preserved)', () => {
       loadContent(editor, 'A\n\n\nB\n');
       const raw = editor.markdown?.serialize(editor.getJSON()) ?? '';
       const cleaned = serializeMarkdown(raw);
-      // normalizeMarkdownWhitespace collapses multiple blanks → 1
-      assert.equal(cleaned, 'A\n\nB\n');
+      // normalizeMarkdownWhitespace halves newline sequences, preserving blank line count
+      assert.equal(cleaned, 'A\n\n\nB\n');
     });
 
     it('produces no ZWS characters in the serialized output', () => {

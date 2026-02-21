@@ -44,18 +44,24 @@ export function postprocessMarkdown(markdown: string): string {
 }
 
 /**
- * Normalize markdown whitespace
+ * Normalize markdown whitespace after ZWS placeholder removal.
  *
- * Ensures consistent paragraph spacing:
- * - At most one blank line between paragraphs (collapses 3+ consecutive newlines to 2)
+ * Each blank line in the file is stored as an empty/ZWS paragraph in the editor.
+ * That paragraph contributes an extra \n\n to serialized output, doubling the
+ * newline count. Halving sequences of 4+ newlines restores the original count.
+ *
+ * Formula: K blank lines → 2*(K+1) newlines in raw output → K+1 newlines after halving
+ * Examples:
+ *   \n\n\n\n  (4)  → \n\n   (1 blank line)
+ *   \n\n\n\n\n\n (6) → \n\n\n (2 blank lines)
+ *   \n{12}        → \n{6}  (5 blank lines)
  */
 export function normalizeMarkdownWhitespace(markdown: string): string {
   if (!markdown || typeof markdown !== 'string') {
     return '';
   }
 
-  // Normalize paragraph spacing (ensure max one blank line between paragraphs)
-  return markdown.replace(/\n{3,}/g, '\n\n');
+  return markdown.replace(/\n{4,}/g, match => '\n'.repeat(match.length / 2));
 }
 
 /**
