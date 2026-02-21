@@ -78,7 +78,8 @@ function createTiptapEditor(editorElement: HTMLElement): Editor {
       }),
       Markdown.configure({
         markedOptions: {
-          gfm: true
+          gfm: true,
+          breaks: true
         }
       })
     ],
