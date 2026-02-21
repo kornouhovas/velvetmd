@@ -11,6 +11,7 @@ import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
 import type { ExtensionMessage } from '../../types';
 import { serializeMarkdown } from '../../utils/markdownSerializer';
+import { addBlankLinePlaceholders } from '../../utils/blankLinePlaceholders';
 import { MAX_CONTENT_SIZE_BYTES, formatBytes } from '../../constants';
 import { lineToScrollState } from '../../utils/scrollUtils';
 
@@ -199,7 +200,9 @@ function handleDocumentChanged(state: EditorState, content: string): void {
 
   // Only update if content actually changed (prevents unnecessary cursor resets)
   if (currentMarkdown !== content) {
-    state.editor.commands.setContent(content, {
+    // Insert ZWS placeholders so each blank line becomes a navigable paragraph node
+    const contentWithPlaceholders = addBlankLinePlaceholders(content);
+    state.editor.commands.setContent(contentWithPlaceholders, {
       emitUpdate: false,
       contentType: 'markdown'
     });

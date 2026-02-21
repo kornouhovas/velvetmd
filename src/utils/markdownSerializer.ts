@@ -25,6 +25,9 @@ export function postprocessMarkdown(markdown: string): string {
   // Remove &nbsp; at end of lines
   processed = processed.replace(/&nbsp;$/gm, '');
 
+  // Strip blank-line placeholder characters (zero-width spaces inserted by addBlankLinePlaceholders)
+  processed = processed.replace(/\u200B/g, '');
+
   // Normalize line endings (CRLF → LF)
   processed = processed.replace(/\r\n/g, '\n');
 
