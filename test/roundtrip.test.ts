@@ -6,6 +6,7 @@ import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from '@tiptap/markdown';
 import TaskList from '@tiptap/extension-task-list';
 import TaskItem from '@tiptap/extension-task-item';
+import { serializeMarkdown } from '../src/utils/markdownSerializer';
 
 /**
  * Round-trip Markdown Tests
@@ -245,4 +246,68 @@ describe('Markdown Round-trip Conversion', () => {
     const cleaned = result.replace(/&nbsp;/g, '').trim();
     assert.equal(cleaned, '', 'Empty content should serialize to empty string');
   });
+});
+
+describe('Soft Break Round-trips (breaks: true)', () => {
+  let breaksEditor: Editor;
+
+  beforeEach(() => {
+    const element = document.createElement('div');
+    breaksEditor = new Editor({
+      element,
+      extensions: [
+        StarterKit.configure({
+          heading: { levels: [1, 2, 3, 4, 5, 6] }
+        }),
+        Markdown.configure({
+          markedOptions: {
+            gfm: true,
+            breaks: true
+          }
+        })
+      ],
+      content: '',
+      contentType: 'markdown'
+    });
+  });
+
+  afterEach(() => {
+    breaksEditor.destroy();
+  });
+
+  const testSoftBreakRoundTrip = (input: string, expected: string, description: string) => {
+    it(description, () => {
+      breaksEditor.commands.setContent(input, {
+        emitUpdate: false,
+        contentType: 'markdown'
+      });
+      const raw = breaksEditor.markdown.serialize(breaksEditor.getJSON());
+      const result = serializeMarkdown(raw);
+      assert.equal(result, expected, `Round-trip failed:\nInput:    ${JSON.stringify(input)}\nExpected: ${JSON.stringify(expected)}\nGot:      ${JSON.stringify(result)}`);
+    });
+  };
+
+  testSoftBreakRoundTrip(
+    'Line 1\nLine 2\n',
+    'Line 1\nLine 2\n',
+    'should preserve single newline as soft break'
+  );
+
+  testSoftBreakRoundTrip(
+    'Para 1\n\nPara 2\n',
+    'Para 1\n\nPara 2\n',
+    'should preserve blank line as paragraph separator'
+  );
+
+  testSoftBreakRoundTrip(
+    'A\nB\n\nC\nD\n',
+    'A\nB\n\nC\nD\n',
+    'should preserve mixed soft breaks and paragraph separators'
+  );
+
+  testSoftBreakRoundTrip(
+    'Single line\n',
+    'Single line\n',
+    'should preserve single-line paragraph without soft break'
+  );
 });
