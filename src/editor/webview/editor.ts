@@ -1,4 +1,4 @@
-import { Editor } from '@tiptap/core';
+import { Editor, Extension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Markdown } from '@tiptap/markdown';
 import Link from '@tiptap/extension-link';
@@ -35,12 +35,71 @@ interface EditorState {
 }
 
 /**
+ * Overrides Enter to insert a soft line break (hardBreak) instead of a new paragraph.
+ *
+ * Behavior:
+ * - Enter in a top-level paragraph → inserts hardBreak (serialized as \n via postprocessMarkdown)
+ * - Double Enter (Enter when cursor is at end of paragraph and last child is hardBreak)
+ *   → deletes the trailing hardBreak and splits the block (= new paragraph / blank line in file)
+ * - Enter in any other context (list item, heading, code block, blockquote) → default behavior
+ *
+ * Why depth === 1: In ProseMirror, $from.depth is the number of ancestor nodes.
+ * A cursor inside a top-level paragraph has depth 1 (doc → paragraph → cursor).
+ * List/blockquote paragraphs have depth 2+.
+ */
+const SoftBreaksExtension = Extension.create({
+  name: 'softBreaks',
+  priority: 150,
+
+  addKeyboardShortcuts() {
+    return {
+      Enter: () => {
+        const { state } = this.editor;
+        const { $from, empty } = state.selection;
+
+        // Only override Enter inside top-level paragraphs (depth 1 = direct child of doc)
+        if ($from.parent.type.name !== 'paragraph' || $from.depth !== 1) {
+          return false;
+        }
+
+        // Non-empty selection: replace with hard break
+        if (!empty) {
+          return this.editor.commands.setHardBreak();
+        }
+
+        const node = $from.parent;
+        const offset = $from.parentOffset;
+
+        // Double Enter: cursor at end of paragraph and last child is a hardBreak
+        // → remove trailing hardBreak and create new paragraph (blank line in file)
+        if (offset === node.content.size && node.lastChild?.type.name === 'hardBreak') {
+          return this.editor.chain()
+            .command(({ tr, dispatch }) => {
+              if (dispatch) {
+                // Delete the trailing hardBreak (nodeSize = 1)
+                tr.delete($from.pos - 1, $from.pos);
+              }
+              return true;
+            })
+            .splitBlock()
+            .run();
+        }
+
+        // Single Enter: insert hard break (stays in same paragraph, adds \n to file)
+        return this.editor.commands.setHardBreak();
+      }
+    };
+  }
+});
+
+/**
  * Creates a Tiptap editor instance with markdown support
  */
 function createTiptapEditor(editorElement: HTMLElement): Editor {
   const editor = new Editor({
     element: editorElement,
     extensions: [
+      SoftBreaksExtension,
       StarterKit.configure({
         link: false
       }),
