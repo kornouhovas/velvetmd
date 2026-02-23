@@ -18,10 +18,11 @@ export function lineToScrollState(
   scrollHeight: number,
   viewportHeight: number
 ): number {
+  if (!Number.isFinite(scrollHeight) || !Number.isFinite(viewportHeight)) { return 0; }
   if (totalLines <= 0) { return 0; }
 
   const scrollableHeight = Math.max(scrollHeight - viewportHeight, 0);
-  const clampedLine = Math.max(0, line);
+  const clampedLine = Math.max(0, Number.isNaN(line) ? 0 : line);
   const rawScrollTop = Math.round((clampedLine / totalLines) * scrollHeight);
   return Math.min(rawScrollTop, scrollableHeight);
 }
@@ -44,6 +45,7 @@ export function scrollStateToLine(
   viewportHeight: number,
   totalLines: number
 ): number {
+  if (!Number.isFinite(scrollTop) || !Number.isFinite(scrollHeight) || !Number.isFinite(viewportHeight)) { return 0; }
   if (totalLines <= 0 || scrollHeight <= 0) { return 0; }
 
   const scrollableHeight = Math.max(scrollHeight - viewportHeight, 0);

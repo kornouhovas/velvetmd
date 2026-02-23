@@ -35,3 +35,15 @@ export function isEchoContent(
 ): boolean {
   return lastWebviewContent !== undefined && currentContent === lastWebviewContent;
 }
+
+/**
+ * Returns true if a scroll dimension value is safe to use.
+ *
+ * Rejects NaN, Infinity, and negative values which can cause
+ * undefined behavior when stored and later passed to scroll APIs.
+ *
+ * @param value - A scroll dimension (scrollTop, scrollHeight, viewportHeight)
+ */
+export function isValidScrollDimension(value: number): boolean {
+  return Number.isFinite(value) && value >= 0;
+}

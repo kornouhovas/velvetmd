@@ -3,7 +3,7 @@ import * as crypto from 'crypto';
 import { debounce } from '../utils/debounce';
 import { WebviewMessage, ConfigMessage, ScrollSyncMessage, ScrollState } from '../types';
 import { MAX_CONTENT_SIZE_BYTES, formatBytes } from '../constants';
-import { isWithinCooldown, isEchoContent } from '../utils/providerUtils';
+import { isWithinCooldown, isEchoContent, isValidScrollDimension } from '../utils/providerUtils';
 
 interface UpdateMetadata {
   source: 'webview' | 'external';
@@ -16,21 +16,24 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
    * document changes originated from the webview itself.
    * This prevents the echo loop: webview -> document -> webview
    *
-   * 500ms was chosen to account for:
-   * - VS Code workspace edit latency (~50-100ms typical)
-   * - Event propagation delays
-   * - Safety margin for slower systems
+   * 1000ms accounts for:
+   * - 30ms onUpdate debounce in webview
+   * - ~50ms IPC latency
+   * - 150ms document-change debounce
+   * - Safety margin for slow systems / large documents
    *
-   * Values too low may cause update loops; too high may miss rapid external edits.
+   * Total round-trip is ~230ms, so 1000ms gives ~770ms safety buffer.
    */
   // eslint-disable-next-line @typescript-eslint/naming-convention
-  private static readonly WEBVIEW_UPDATE_COOLDOWN_MS = 500;
+  private static readonly WEBVIEW_UPDATE_COOLDOWN_MS = 1000;
 
   /**
-   * Debounce delay for document change events (in milliseconds)
+   * Debounce delay for document change events (in milliseconds).
+   * 150ms is fast enough for responsive external-edit detection while
+   * keeping the total round-trip well within the cooldown window.
    */
   // eslint-disable-next-line @typescript-eslint/naming-convention
-  private static readonly DOCUMENT_CHANGE_DEBOUNCE_MS = 300;
+  private static readonly DOCUMENT_CHANGE_DEBOUNCE_MS = 150;
 
   private readonly lastUpdates = new Map<string, UpdateMetadata>();
   private readonly lastWebviewContent = new Map<string, string>();
@@ -160,9 +163,9 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
         case 'scrollSync': {
           const msg = message as ScrollSyncMessage;
           if (
-            typeof msg.scrollTop === 'number' &&
-            typeof msg.scrollHeight === 'number' &&
-            typeof msg.viewportHeight === 'number'
+            isValidScrollDimension(msg.scrollTop) &&
+            isValidScrollDimension(msg.scrollHeight) &&
+            isValidScrollDimension(msg.viewportHeight)
           ) {
             this.lastScrollState.set(document.uri.toString(), {
               scrollTop: msg.scrollTop,

@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { isWithinCooldown, isEchoContent } from '../src/utils/providerUtils';
+import { isWithinCooldown, isEchoContent, isValidScrollDimension } from '../src/utils/providerUtils';
 
 describe('isWithinCooldown', () => {
   test('returns true when within cooldown window', () => {
@@ -44,5 +44,31 @@ describe('isEchoContent', () => {
 
   test('returns false when last content is undefined (no previous webview update)', () => {
     assert.strictEqual(isEchoContent('# Hello\n', undefined), false);
+  });
+});
+
+describe('isValidScrollDimension', () => {
+  test('returns true for a normal positive number', () => {
+    assert.strictEqual(isValidScrollDimension(1200), true);
+  });
+
+  test('returns true for zero', () => {
+    assert.strictEqual(isValidScrollDimension(0), true);
+  });
+
+  test('returns false for NaN', () => {
+    assert.strictEqual(isValidScrollDimension(NaN), false);
+  });
+
+  test('returns false for Infinity', () => {
+    assert.strictEqual(isValidScrollDimension(Infinity), false);
+  });
+
+  test('returns false for -Infinity', () => {
+    assert.strictEqual(isValidScrollDimension(-Infinity), false);
+  });
+
+  test('returns false for negative number', () => {
+    assert.strictEqual(isValidScrollDimension(-1), false);
   });
 });

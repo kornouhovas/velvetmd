@@ -14,6 +14,7 @@ import { serializeMarkdown } from '../../utils/markdownSerializer';
 import { addBlankLinePlaceholders } from '../../utils/blankLinePlaceholders';
 import { MAX_CONTENT_SIZE_BYTES, formatBytes } from '../../constants';
 import { lineToScrollState } from '../../utils/scrollUtils';
+import { validateLinkHref } from '../../utils/linkValidator';
 
 declare function acquireVsCodeApi(): {
   postMessage(message: unknown): void;
@@ -71,6 +72,19 @@ const SoftBreaksExtension = Extension.create({
         const node = $from.parent;
         const offset = $from.parentOffset;
 
+        // Empty paragraph or ZWS-only placeholder: Enter creates a new paragraph directly.
+        // Without this check, Enter would insert a hardBreak into the empty paragraph,
+        // requiring a second Enter to actually move to a new paragraph.
+        const isEffectivelyEmpty =
+          node.content.size === 0 ||
+          (node.content.size === 1 &&
+            node.firstChild?.type.name === 'text' &&
+            node.firstChild.text === '\u200B');
+
+        if (isEffectivelyEmpty) {
+          return this.editor.commands.splitBlock();
+        }
+
         // Double Enter: cursor at end of paragraph and last child is a hardBreak
         // → remove trailing hardBreak and create new paragraph (blank line in file)
         if (offset === node.content.size && node.lastChild?.type.name === 'hardBreak') {
@@ -97,6 +111,12 @@ const SoftBreaksExtension = Extension.create({
  * Creates a Tiptap editor instance with markdown support
  */
 function createTiptapEditor(editorElement: HTMLElement): Editor {
+  // Debounce timer for onUpdate: defers serialization + IPC so the browser
+  // can paint the new frame before running regex-heavy serialization.
+  // 30ms is ~2 frames at 60fps — imperceptible as a delay but prevents
+  // flooding VS Code with applyEdit on every rapid keystroke.
+  let updateTimer: ReturnType<typeof setTimeout> | null = null;
+
   const editor = new Editor({
     element: editorElement,
     extensions: [
@@ -111,7 +131,7 @@ function createTiptapEditor(editorElement: HTMLElement): Editor {
           rel: 'noopener noreferrer'
         },
         // SECURITY: Only allow http(s) and mailto URLs to prevent javascript: URI attacks
-        validate: (href: string) => /^(https?:\/\/|mailto:)/.test(href)
+        validate: validateLinkHref
       }),
       Image.configure({
         inline: true,
@@ -151,19 +171,21 @@ function createTiptapEditor(editorElement: HTMLElement): Editor {
       }
     },
     onUpdate: ({ editor: editorInstance }) => {
-      if (!editorInstance.markdown) {
-        vscode.postMessage({
-          type: 'error',
-          message: 'Markdown extension not initialized'
-        });
-        return;
+      if (updateTimer !== null) {
+        clearTimeout(updateTimer);
       }
-      const rawMarkdown = editorInstance.markdown.serialize(editorInstance.getJSON());
-      const cleanedMarkdown = serializeMarkdown(rawMarkdown);
-      vscode.postMessage({
-        type: 'update',
-        content: cleanedMarkdown
-      });
+      updateTimer = setTimeout(() => {
+        updateTimer = null;
+        if (editorInstance.isDestroyed || !editorInstance.markdown) {
+          return;
+        }
+        const rawMarkdown = editorInstance.markdown.serialize(editorInstance.getJSON());
+        const cleanedMarkdown = serializeMarkdown(rawMarkdown);
+        vscode.postMessage({
+          type: 'update',
+          content: cleanedMarkdown
+        });
+      }, 30);
     }
   });
 
@@ -172,8 +194,10 @@ function createTiptapEditor(editorElement: HTMLElement): Editor {
 
 /**
  * Handles document content changes from VS Code
+ * scrollTop is only restored when setContent is actually called (genuine external edit)
+ * to avoid jitter from scroll jumps on echoed updates.
  */
-function handleDocumentChanged(state: EditorState, content: string): void {
+function handleDocumentChanged(state: EditorState, content: string, scrollTop?: number): void {
   if (!state.editor) {
     return;
   }
@@ -206,6 +230,12 @@ function handleDocumentChanged(state: EditorState, content: string): void {
       emitUpdate: false,
       contentType: 'markdown'
     });
+    // Restore scroll only when content actually changed (genuine external edit)
+    if (typeof scrollTop === 'number') {
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: scrollTop, behavior: 'instant' });
+      });
+    }
   }
 }
 
@@ -218,19 +248,20 @@ function setupMessageListener(state: EditorState): void {
 
     switch (message.type) {
       case 'documentChanged':
-        handleDocumentChanged(state, message.content);
-        if (typeof message.scrollTop === 'number') {
-          const scrollTop = message.scrollTop;
-          requestAnimationFrame(() => {
-            window.scrollTo({ top: scrollTop, behavior: 'instant' });
-          });
-        }
+        handleDocumentChanged(
+          state,
+          message.content,
+          typeof message.scrollTop === 'number' ? message.scrollTop : undefined
+        );
         break;
       case 'config':
         state.showSyntaxOnFocus = message.showSyntaxOnFocus;
         break;
       case 'scrollRestoreLine': {
         const { line, totalLines } = message;
+        if (!Number.isFinite(line) || !Number.isFinite(totalLines) || line < 0 || totalLines <= 0) {
+          break;
+        }
         requestAnimationFrame(() => {
           const el = document.documentElement;
           const scrollTop = lineToScrollState(line, totalLines, el.scrollHeight, el.clientHeight);

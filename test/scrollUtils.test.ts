@@ -1,5 +1,5 @@
 /**
- * Unit tests for scrollUtils — AT-SC-001..AT-SC-016
+ * Unit tests for scrollUtils — AT-SC-001..AT-SC-022
  *
  * Both functions share the same model:
  *   line N is at pixel (N / totalLines) × scrollHeight
@@ -52,6 +52,19 @@ describe('scrollStateToLine', () => {
   test('AT-SC-008: negative scrollTop → clamped to line 0', () => {
     assert.strictEqual(scrollStateToLine(-100, 2000, 800, 100), 0);
   });
+
+  // AT-SC-017: NaN/Infinity guards
+  test('AT-SC-017: NaN scrollTop → 0', () => {
+    assert.strictEqual(scrollStateToLine(NaN, 2000, 800, 100), 0);
+  });
+
+  test('AT-SC-018: Infinity scrollTop → 0', () => {
+    assert.strictEqual(scrollStateToLine(Infinity, 2000, 800, 100), 0);
+  });
+
+  test('AT-SC-019: NaN scrollHeight → 0', () => {
+    assert.strictEqual(scrollStateToLine(100, NaN, 800, 100), 0);
+  });
 });
 
 describe('lineToScrollState', () => {
@@ -98,5 +111,18 @@ describe('lineToScrollState', () => {
     assert.strictEqual(scrollTop, 840);
     const recovered = scrollStateToLine(scrollTop, 2000, 800, 100);
     assert.strictEqual(recovered, line);
+  });
+
+  // AT-SC-020: NaN/Infinity guards
+  test('AT-SC-020: NaN line → 0', () => {
+    assert.strictEqual(lineToScrollState(NaN, 100, 2000, 800), 0);
+  });
+
+  test('AT-SC-021: Infinity line → clamped to scrollableHeight', () => {
+    assert.strictEqual(lineToScrollState(Infinity, 100, 2000, 800), 1200);
+  });
+
+  test('AT-SC-022: NaN scrollHeight → 0', () => {
+    assert.strictEqual(lineToScrollState(50, 100, NaN, 800), 0);
   });
 });
