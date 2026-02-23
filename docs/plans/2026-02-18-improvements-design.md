@@ -31,11 +31,13 @@ Four improvement blocks targeting code quality, configuration wiring, bidirectio
 **Settings read from** `vscode.workspace.getConfiguration('velvetMd')`:
 
 ### `autoReloadOnExternalChanges` (boolean, default: true)
+
 - Location: `markdownEditorProvider.ts`, `setupDocumentChangeHandling`
 - When `false`: skip `sendDocumentToWebview` on external edits
 - Config is re-read on each change event (supports runtime changes via VS Code settings)
 
 ### `showSyntaxOnFocus` (boolean, default: true)
+
 - Location: passed to webview via a new `ConfigMessage` on editor init and on config change
 - Webview stores the flag and passes it to Tiptap (stub — wiring without full Tiptap extension implementation)
 - Message type: `{ type: 'config', showSyntaxOnFocus: boolean }`
@@ -51,7 +53,10 @@ Four improvement blocks targeting code quality, configuration wiring, bidirectio
 ScrollSyncMessage { type: 'scrollSync'; scrollTop: number; scrollHeight: number; viewportHeight: number }
 
 // Extension → Webview
-ScrollRestoreMessage { type: 'scrollRestore'; scrollTop: number }
+// NOTE: Implemented as scrollRestoreLine (line-based) rather than scrollRestore (pixel-based).
+// Line-based is more robust: pixel offsets change when the webview reflows,
+// but a line number is stable across layout changes.
+ScrollRestoreLineMessage { type: 'scrollRestoreLine'; line: number; totalLines: number }
 
 // Extension → Webview (updated)
 ConfigMessage { type: 'config'; showSyntaxOnFocus: boolean }
@@ -68,15 +73,15 @@ Inverse of `scrollStateToLine`. Maps a 0-based line index to a `scrollTop` pixel
 ### Webview (`editor.ts`)
 
 - **Throttled scroll listener** (100ms): reads `document.documentElement.scrollTop / scrollHeight / clientHeight`, emits `scrollSync`
-- **On `scrollRestore`**: `window.scrollTo({ top: scrollTop, behavior: 'instant' })`
+- **On `scrollRestoreLine`**: converts `{line, totalLines}` → `scrollTop` via `lineToScrollState`, then `window.scrollTo({ top: scrollTop, behavior: 'instant' })`; inputs validated (`Number.isFinite`, non-negative)
 - **On `config`**: store `showSyntaxOnFocus` flag for future use
 
 ### Extension (`markdownEditorProvider.ts`)
 
 - `lastScrollTop` map per document (like `lastUpdates`)
-- **On `scrollSync`**: compute line via `scrollStateToLine`, store `scrollTop`, log
+- **On `scrollSync**`: compute line via `scrollStateToLine`, store `scrollTop`, log
 - **On external reload** (`sendDocumentToWebview`): include `scrollTop` in message or send separate `scrollRestore` after
-- **`velvetMd.openWithVelvet` command** (in `extension.ts`): capture `activeTextEditor?.visibleRanges[0].start.line`, convert via `lineToScrollState` (using placeholder scrollHeight/viewport), send `scrollRestore` to webview
+- `**velvetMd.openWithVelvet` command** (in `extension.ts`): capture `activeTextEditor?.visibleRanges[0].start.line`, convert via `lineToScrollState` (using placeholder scrollHeight/viewport), send `scrollRestore` to webview
 
 ---
 
@@ -98,15 +103,15 @@ isEchoContent(content: string, lastContent: string): boolean
 
 ## Files Changed
 
-| File | Change |
-|------|--------|
-| `src/utils/markdownSerializer.ts` | Remove duplicate CRLF/whitespace logic from `normalizeMarkdownWhitespace` |
-| `src/utils/scrollUtils.ts` | Add `lineToScrollState` function |
-| `src/utils/providerUtils.ts` | New file — extracted pure functions |
-| `src/types.ts` | Add `ScrollSyncMessage`, `ScrollRestoreMessage`, `ConfigMessage` |
-| `src/providers/markdownEditorProvider.ts` | Config reading, scroll state tracking, scroll restore |
-| `src/editor/webview/editor.ts` | Scroll listener, scroll restore handler, config handler |
-| `src/extension.ts` | Pass scroll position on `openWithVelvet` |
-| `test/markdownSerializer.test.ts` | New — serializer pipeline tests |
-| `test/scrollUtils.test.ts` | Add `lineToScrollState` tests |
-| `test/providerUtils.test.ts` | New — pure provider logic tests |
+| File                                      | Change                                                                    |
+| ----------------------------------------- | ------------------------------------------------------------------------- |
+| `src/utils/markdownSerializer.ts`         | Remove duplicate CRLF/whitespace logic from `normalizeMarkdownWhitespace` |
+| `src/utils/scrollUtils.ts`                | Add `lineToScrollState` function                                          |
+| `src/utils/providerUtils.ts`              | New file — extracted pure functions                                       |
+| `src/types.ts`                            | Add `ScrollSyncMessage`, `ScrollRestoreMessage`, `ConfigMessage`          |
+| `src/providers/markdownEditorProvider.ts` | Config reading, scroll state tracking, scroll restore                     |
+| `src/editor/webview/editor.ts`            | Scroll listener, scroll restore handler, config handler                   |
+| `src/extension.ts`                        | Pass scroll position on `openWithVelvet`                                  |
+| `test/markdownSerializer.test.ts`         | New — serializer pipeline tests                                           |
+| `test/scrollUtils.test.ts`                | Add `lineToScrollState` tests                                             |
+| `test/providerUtils.test.ts`              | New — pure provider logic tests                                           |

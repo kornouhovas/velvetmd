@@ -84,7 +84,7 @@ The core challenge is maintaining **round-trip fidelity** between markdown text 
 
 ```
 VS Code Document (plain text .md)
-        ↕ (debounced 300ms)
+        ↕ (debounced 150ms)
 MarkdownEditorProvider (extension host)
         ↕ (postMessage)
 Tiptap Editor (webview)
@@ -94,15 +94,21 @@ Tiptap Editor (webview)
 
 Located in `src/providers/markdownEditorProvider.ts`:
 
-- **`WEBVIEW_UPDATE_COOLDOWN_MS = 500`**
+- **`WEBVIEW_UPDATE_COOLDOWN_MS = 1000`**
   - Prevents echo loops after webview updates
   - Time window where document changes are assumed to originate from webview
-  - Accounts for VS Code workspace edit latency (~50-100ms) + safety margin
+  - Accounts for: 30ms onUpdate debounce + ~50ms IPC + 150ms doc debounce = ~230ms round-trip
+  - Remaining ~770ms is a safety buffer for slow systems / large documents
+  - **Trade-off:** External edits within 1s of a user keystroke are suppressed by this guard
   - Too low → update loops; too high → miss rapid external edits
 
-- **`DOCUMENT_CHANGE_DEBOUNCE_MS = 300`**
+- **`DOCUMENT_CHANGE_DEBOUNCE_MS = 150`**
   - Debounces external file changes to reduce update frequency
   - Prevents excessive re-renders during rapid external edits (e.g., git operations)
+
+- **`onUpdate` debounce (30ms, in `editor.ts`)**
+  - Defers serialization + IPC so the browser can paint before heavy regex work
+  - ~2 frames at 60fps — imperceptible delay, prevents flooding VS Code on rapid keystrokes
 
 #### Update Flow Prevention Logic
 
@@ -117,26 +123,31 @@ Uses `lastUpdates` Map to track update sources:
 Defined in `src/types.ts`:
 
 **Extension → Webview:**
-- `DocumentChangedMessage` - File content updated externally
+- `DocumentChangedMessage` - File content updated externally (includes `scrollTop` for scroll restore)
+- `ConfigMessage` - Editor configuration (`showSyntaxOnFocus`)
+- `ScrollRestoreLineMessage` - Restore scroll to a specific line `{ type: 'scrollRestoreLine'; line: number; totalLines: number }`
 
 **Webview → Extension:**
 - `UpdateMessage` - Editor content changed by user
 - `ReadyMessage` - Editor initialized successfully
 - `ErrorMessage` - Editor error occurred
+- `ScrollSyncMessage` - Current scroll position `{ scrollTop, scrollHeight, viewportHeight }`
 
 ### Markdown Processing Pipeline
 
 #### Parsing (Markdown → Editor)
 - Tiptap's `@tiptap/markdown` extension converts to ProseMirror schema
-- **Security:** Link extension validates URLs (`/^(https?:\/\/|mailto:)/`) to prevent `javascript:` attacks
+- **Blank line navigation:** `addBlankLinePlaceholders()` inserts ZWS (`\u200B`) paragraph nodes for each blank line so ProseMirror creates navigable nodes. ZWS is stripped on save by `serializeMarkdown()`.
+  - **Known limitation:** Files containing literal `\u200B` characters will have them stripped on the next save cycle.
+- **Security:** Link extension uses `validateLinkHref()` (`src/utils/linkValidator.ts`) — allows only `https://`, `http://`, `mailto:` (case-insensitive); blocks `javascript:`, `mailto:javascript:`, `data:`, null bytes, newlines.
 - **Size limit:** `MAX_CONTENT_SIZE_BYTES = 10MB` enforced in constants
 
 #### Serialization (Editor → Markdown)
 Located in `src/utils/markdownSerializer.ts`:
 
-- `serializeMarkdown()` - Main entry point for webview output
-- `postprocessMarkdown()` - Removes `&nbsp;`, normalizes spacing
-- Ensures POSIX-compliant file endings (single trailing newline)
+- `serializeMarkdown()` - Main entry point; calls both steps below
+- `postprocessMarkdown()` - Strips ZWS placeholders, removes `&nbsp;`, normalizes CRLF, trims trailing whitespace, ensures POSIX trailing newline
+- `normalizeMarkdownWhitespace()` - Halves sequences of 4+ newlines to restore blank line count: `K blank lines → 2*(K+1)` newlines in raw output → `K+1` after halving
 
 **Important:** Raw Tiptap output may not preserve formatting perfectly. The `serializeMarkdown()` utility fixes these issues, which is why some round-trip tests are expected to fail (they test raw output).
 
@@ -151,24 +162,30 @@ Located in `src/editor/webview/editor.ts`:
   - Contains DOM references (Editor instance, MessageHandler)
   - State isolated in closure, not exposed globally
 - **Update flow:**
-  - User edits → `onUpdate` callback → `serializeMarkdown()` → `postMessage('update')`
-  - Extension message → `handleDocumentChanged` → `setContent({ emitUpdate: false })`
+  - User edits → `onUpdate` (30ms debounce) → `serializeMarkdown()` → `postMessage('update')`
+  - Extension message → `handleDocumentChanged` → content equality check → `setContent({ emitUpdate: false })` + scroll restore (only when content actually changed)
+- **`SoftBreaksExtension`** (priority 150): overrides Enter key
+  - Single Enter in a paragraph → `hardBreak` (soft line break, `\n` in file)
+  - Double Enter (Enter when last char is hardBreak) → removes hardBreak + `splitBlock` (new paragraph, blank line in file)
+  - Enter in empty/ZWS-only paragraph → `splitBlock` directly (no intermediate hardBreak)
 
 ### Security
 
 1. **Content Security Policy (CSP):**
    - Located in `MarkdownEditorProvider.getHtmlForWebview()`
-   - Strict CSP with cryptographic nonces (`crypto.randomBytes(16)`)
+   - Strict CSP with cryptographic nonces (`crypto.randomBytes(16)`, 128-bit entropy)
    - `default-src 'none'` - deny all by default
-   - Scripts/styles only via nonce
+   - `'unsafe-inline'` required for `style-src` due to ProseMirror inline style generation (documented accepted risk)
 
 2. **XSS Prevention:**
-   - Link extension validates URLs (no `javascript:` URIs)
+   - `validateLinkHref()` in `src/utils/linkValidator.ts`: allowlist-only (`https?://`, `mailto:`), case-insensitive, blocks `mailto:javascript:` via negative lookahead, rejects null bytes / newlines
    - No raw HTML passthrough in markdown parser
 
 3. **Input Validation:**
-   - `MAX_CONTENT_SIZE_BYTES = 10MB` enforced consistently
-   - Type checking for all message payloads
+   - `MAX_CONTENT_SIZE_BYTES = 10MB` enforced in both extension host and webview
+   - `isValidScrollDimension()` in `providerUtils.ts`: rejects NaN, Infinity, negative scroll values
+   - NaN/Infinity guards in `scrollUtils.ts` (`scrollStateToLine`, `lineToScrollState`)
+   - `scrollRestoreLine` message: `line` and `totalLines` validated before use
    - `formatBytes()` validates non-negative finite numbers
 
 ### Configuration
@@ -182,16 +199,20 @@ Extension settings in `package.json` → `contributes.configuration`:
 
 **Extension Host (Node.js):**
 - `src/extension.ts` - Extension activation/deactivation
-- `src/providers/markdownEditorProvider.ts` - Custom editor provider (~236 lines)
+- `src/providers/markdownEditorProvider.ts` - Custom editor provider
 - `src/utils/debounce.ts` - Debouncing utility
 
 **Webview (Browser):**
-- `src/editor/webview/editor.ts` - Tiptap initialization and sync (~150 lines)
-- `media/webview/styles.css` - Editor styling
+- `src/editor/webview/editor.ts` - Tiptap init, `SoftBreaksExtension`, scroll sync
+- `media/webview/styles.css` - Editor styling (all block elements `margin: 0`)
 
 **Utilities (Shared concepts, separate bundles):**
 - `src/constants.ts` - Centralized constants, `formatBytes()`
-- `src/utils/markdownSerializer.ts` - Editor → Markdown serialization (~165 lines)
+- `src/utils/markdownSerializer.ts` - `serializeMarkdown`, `postprocessMarkdown`, `normalizeMarkdownWhitespace`
+- `src/utils/blankLinePlaceholders.ts` - `addBlankLinePlaceholders` (ZWS paragraph insertion)
+- `src/utils/scrollUtils.ts` - `scrollStateToLine`, `lineToScrollState` (with NaN/Infinity guards)
+- `src/utils/providerUtils.ts` - `isWithinCooldown`, `isEchoContent`, `isValidScrollDimension`
+- `src/utils/linkValidator.ts` - `validateLinkHref` (URL allowlist, `mailto:javascript:` guard)
 - `src/utils/debounce.ts` - Debouncing utility
 - `src/types.ts` - Message type definitions
 
@@ -200,6 +221,12 @@ Extension settings in `package.json` → `contributes.configuration`:
 - `test/roundtrip.test.ts` - Round-trip fidelity tests (26 test cases)
 - `test/link-image.test.ts` - Link and image handling tests
 - `test/constants.test.ts` - Utility function tests (14 tests)
+- `test/markdownSerializer.test.ts` - Serializer pipeline tests (16 tests)
+- `test/blankLinePlaceholders.test.ts` - ZWS placeholder insertion tests (13 tests)
+- `test/blank-line-navigation.test.ts` - Integration: blank line structure + round-trip (9 tests)
+- `test/scrollUtils.test.ts` - Scroll conversion tests incl. NaN/Infinity (22 tests)
+- `test/providerUtils.test.ts` - Provider pure utility tests incl. scroll validation (16 tests)
+- `test/linkValidator.test.ts` - URL validation tests (15 tests)
 
 ### Testing Strategy
 
@@ -220,7 +247,11 @@ const result = editor.markdown.serialize(editor.getJSON());
 
 1. **Round-trip Tests:** Some tests in `test/roundtrip.test.ts` currently fail - this is expected during PoC phase. Tests verify that raw Tiptap output matches input, but actual implementation uses `serializeMarkdown()` utility which fixes these issues.
 
-2. **Webview Bundle Size:** 398KB (exceeds webpack recommendation of 244KB) - acceptable for rich text editor with Tiptap dependencies.
+2. **Webview Bundle Size:** ~452KB (exceeds webpack recommendation of 244KB) - acceptable for rich text editor with Tiptap dependencies.
+
+3. **ZWS Character Stripping:** `postprocessMarkdown()` strips all `\u200B` (zero-width space) characters on save. Files that legitimately contain `\u200B` (e.g., East Asian typography) will have them removed silently.
+
+4. **Fenced Code Block Detection:** `addBlankLinePlaceholders()` tracks fence type (`\`` vs `~`) but does not handle indented fences (up to 3 spaces per CommonMark spec). Indented fences are uncommon in practice.
 
 ### Development Workflow
 
