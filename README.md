@@ -4,7 +4,7 @@
 
 ## Status
 
-🚧 **Early Development** - v0.2.0
+🚧 **Early Development** - v0.3.0
 
 This extension is in active development. Features and API may change.
 
@@ -23,6 +23,8 @@ This extension is in active development. Features and API may change.
   - Blockquotes
   - Horizontal rules
   - Ordered and unordered lists
+- **Natural Enter key behaviour** - Single Enter inserts a soft line break; double Enter creates a new paragraph (blank line in file)
+- **Blank line navigation** - Blank lines are navigable with arrow keys inside the editor
 - **Bidirectional Sync** - Changes sync seamlessly between the editor and file system
 - **Scroll Position Sync** - Scroll position is preserved when switching between Velvet MD and Text Editor
 - **Focus Mode** - Show markdown syntax only when editing a block
@@ -105,6 +107,9 @@ npx tsx test/link-image.test.ts
 npx tsx test/scrollUtils.test.ts
 npx tsx test/providerUtils.test.ts
 npx tsx test/markdownSerializer.test.ts
+npx tsx test/linkValidator.test.ts
+npx tsx test/blankLinePlaceholders.test.ts
+npx tsx test/blank-line-navigation.test.ts
 ```
 
 ### Building & Installation
@@ -122,7 +127,7 @@ vsce package
 Install the generated `.vsix` file:
 
 ```bash
-code --install-extension velvet-md-0.2.0.vsix
+code --install-extension velvet-md-0.3.0.vsix
 ```
 
 Or in VS Code: Extensions → `⋯` menu → "Install from VSIX..."
