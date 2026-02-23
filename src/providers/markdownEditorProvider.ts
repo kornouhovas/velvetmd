@@ -23,6 +23,11 @@ export class MarkdownEditorProvider implements vscode.CustomTextEditorProvider {
    * - Safety margin for slow systems / large documents
    *
    * Total round-trip is ~230ms, so 1000ms gives ~770ms safety buffer.
+   *
+   * Trade-off: external edits (git, other editors) made within 1 second of a
+   * user keystroke are suppressed by this guard. The content-based echo check
+   * (`isEchoContent`) provides a second layer for slow echoes, but cannot
+   * distinguish a genuine external edit with identical content.
    */
   // eslint-disable-next-line @typescript-eslint/naming-convention
   private static readonly WEBVIEW_UPDATE_COOLDOWN_MS = 1000;

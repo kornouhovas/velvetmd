@@ -27,16 +27,27 @@ export function addBlankLinePlaceholders(markdown: string): string {
 
   const lines = markdown.split('\n');
   const result: string[] = [];
-  let inFencedCode = false;
+  let fenceChar: string | null = null; // '`' or '~' when inside a fenced block
   const lastIndex = lines.length - 1;
 
   for (let i = 0; i <= lastIndex; i++) {
     const line = lines[i];
 
-    // Track fenced code block open/close (simple toggle on ``` or ~~~ prefix)
-    if (/^(`{3,}|~{3,})/.test(line)) {
-      inFencedCode = !inFencedCode;
+    // Track fenced code block open/close.
+    // A fence must be closed by the same character that opened it (CommonMark §4.5).
+    // A backtick fence is not closed by a tilde fence and vice versa.
+    const fenceMatch = /^([`~]{3,})/.exec(line);
+    if (fenceMatch) {
+      const char = fenceMatch[1][0];
+      if (fenceChar === null) {
+        fenceChar = char;       // entering a fenced block
+      } else if (char === fenceChar) {
+        fenceChar = null;       // closing the matching fence
+      }
+      // mismatched fence character: ignore (still inside the current block)
     }
+
+    const inFencedCode = fenceChar !== null;
 
     if (line === '' && !inFencedCode && i < lastIndex) {
       // Blank line outside code block (not the trailing POSIX newline):

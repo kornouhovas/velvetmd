@@ -15,6 +15,18 @@ describe('validateLinkHref', () => {
     test('allows mailto: links', () => {
       assert.strictEqual(validateLinkHref('mailto:user@example.com'), true);
     });
+
+    test('allows HTTPS:// (uppercase scheme)', () => {
+      assert.strictEqual(validateLinkHref('HTTPS://example.com'), true);
+    });
+
+    test('allows HTTP:// (uppercase scheme)', () => {
+      assert.strictEqual(validateLinkHref('HTTP://example.com'), true);
+    });
+
+    test('allows MAILTO: (uppercase scheme)', () => {
+      assert.strictEqual(validateLinkHref('MAILTO:user@example.com'), true);
+    });
   });
 
   describe('blocked schemes', () => {

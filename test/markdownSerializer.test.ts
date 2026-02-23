@@ -35,8 +35,24 @@ describe('postprocessMarkdown', () => {
 });
 
 describe('normalizeMarkdownWhitespace', () => {
-  test('collapses 3+ consecutive newlines to 2 (1 blank line)', () => {
-    assert.strictEqual(normalizeMarkdownWhitespace('a\n\n\nb'), 'a\n\nb');
+  test('does not modify sequences of exactly 3 newlines (below threshold)', () => {
+    // 3 newlines = 2 blank lines: not touched (threshold is 4+)
+    assert.strictEqual(normalizeMarkdownWhitespace('a\n\n\nb'), 'a\n\n\nb');
+  });
+
+  test('halves a sequence of 4 newlines (1 ZWS placeholder round-trip)', () => {
+    // 4 → 2: one blank line preserved
+    assert.strictEqual(normalizeMarkdownWhitespace('a\n\n\n\nb'), 'a\n\nb');
+  });
+
+  test('halves a sequence of 6 newlines (2 ZWS placeholders)', () => {
+    // 6 → 3: two blank lines preserved
+    assert.strictEqual(normalizeMarkdownWhitespace('a\n\n\n\n\n\nb'), 'a\n\n\nb');
+  });
+
+  test('halves a sequence of 12 newlines (5 blank lines)', () => {
+    // 12 → 6: five blank lines preserved
+    assert.strictEqual(normalizeMarkdownWhitespace('a\n\n\n\n\n\n\n\n\n\n\n\nb'), 'a\n\n\n\n\n\nb');
   });
 
   test('does not change content with single blank line', () => {

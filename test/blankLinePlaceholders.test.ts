@@ -55,6 +55,19 @@ describe('addBlankLinePlaceholders', () => {
     const result = addBlankLinePlaceholders(input);
     assert.equal(result, 'Line 1\nLine 2\nLine 3\n');
   });
+
+  it('does not insert ZWS inside tilde-fenced code blocks', () => {
+    const input = '~~~\nline 1\n\nline 2\n~~~\n';
+    const result = addBlankLinePlaceholders(input);
+    assert.equal(result, '~~~\nline 1\n\nline 2\n~~~\n');
+  });
+
+  it('does not close a backtick fence with a tilde fence marker', () => {
+    // ``` opens; ~~~ must NOT close it — blank line after ~~~ is still inside the block
+    const input = '```\ncode\n~~~\n\nstill inside\n```\n';
+    const result = addBlankLinePlaceholders(input);
+    assert.equal(result, '```\ncode\n~~~\n\nstill inside\n```\n');
+  });
 });
 
 describe('serializeMarkdown strips ZWS placeholders (full pipeline)', () => {

@@ -61,7 +61,10 @@ export function normalizeMarkdownWhitespace(markdown: string): string {
     return '';
   }
 
-  return markdown.replace(/\n{4,}/g, match => '\n'.repeat(match.length / 2));
+  // match.length is always even: each blank line contributes exactly 2 newlines
+  // (one paragraph open + one paragraph close in Tiptap output), so integer
+  // division is exact. Math.floor is explicit for clarity.
+  return markdown.replace(/\n{4,}/g, match => '\n'.repeat(Math.floor(match.length / 2)));
 }
 
 /**

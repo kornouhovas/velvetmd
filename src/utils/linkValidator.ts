@@ -25,9 +25,10 @@ export function validateLinkHref(href: string): boolean {
     return false;
   }
 
-  // Allow only https://, http://, and mailto: schemes.
-  // Negative lookahead (?![a-z]+:) after "mailto:" blocks scheme injection:
+  // Allow only https://, http://, and mailto: schemes (case-insensitive).
+  // Negative lookahead (?![a-zA-Z]+:) after "mailto:" blocks scheme injection:
   // "mailto:javascript:..." has a scheme-like token after the colon → rejected.
-  // "mailto:user@example.com" does not → allowed.
-  return /^(https?:\/\/|mailto:(?![a-z]+:))/.test(href);
+  // "MAILTO:JAVASCRIPT:..." is also rejected (lookahead covers both cases).
+  // "mailto:user@example.com" does not match the lookahead → allowed.
+  return /^(https?:\/\/|mailto:(?![a-zA-Z]+:))/i.test(href);
 }
