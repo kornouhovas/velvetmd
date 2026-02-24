@@ -44,27 +44,38 @@ export function postprocessMarkdown(markdown: string): string {
 }
 
 /**
- * Normalize markdown whitespace after ZWS placeholder removal.
+ * Collapse double newlines to single newlines outside fenced code blocks.
  *
- * Each blank line in the file is stored as an empty/ZWS paragraph in the editor.
- * That paragraph contributes an extra \n\n to serialized output, doubling the
- * newline count. Halving sequences of 4+ newlines restores the original count.
+ * With splitBlock-based Enter:
+ *   - Single Enter → splitBlock → adjacent paragraphs → Tiptap produces \n\n → collapsed to \n
+ *   - Double Enter → empty paragraph in between → Tiptap produces \n\n\n\n → collapsed to \n\n
  *
- * Formula: K blank lines → 2*(K+1) newlines in raw output → K+1 newlines after halving
- * Examples:
- *   \n\n\n\n  (4)  → \n\n   (1 blank line)
- *   \n\n\n\n\n\n (6) → \n\n\n (2 blank lines)
- *   \n{12}        → \n{6}  (5 blank lines)
+ * Math: K blank lines → 2*(K+1) raw newlines → replace(/\n\n/g, '\n') → K+1 newlines = K blank lines.
+ *
+ * Fenced code blocks (``` or ~~~) are protected: their internal newlines are preserved.
  */
-export function normalizeMarkdownWhitespace(markdown: string): string {
-  if (!markdown || typeof markdown !== 'string') {
-    return '';
-  }
+export function collapseParagraphGaps(markdown: string): string {
+  if (!markdown || typeof markdown !== 'string') return '';
 
-  // match.length is always even: each blank line contributes exactly 2 newlines
-  // (one paragraph open + one paragraph close in Tiptap output), so integer
-  // division is exact. Math.floor is explicit for clarity.
-  return markdown.replace(/\n{4,}/g, match => '\n'.repeat(Math.floor(match.length / 2)));
+  // Extract fenced code blocks into placeholders
+  const codeBlocks: string[] = [];
+  let result = markdown.replace(
+    /^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[ \t]*$/gm,
+    (match) => {
+      const idx = codeBlocks.length;
+      codeBlocks.push(match);
+      return `\x00CODEBLOCK${idx}\x00`;
+    }
+  );
+
+  // Collapse \n\n → \n outside code blocks
+  result = result.replace(/\n\n/g, '\n');
+
+  // Restore code blocks
+  for (let i = 0; i < codeBlocks.length; i++) {
+    result = result.replace(`\x00CODEBLOCK${i}\x00`, codeBlocks[i]);
+  }
+  return result;
 }
 
 /**
@@ -72,6 +83,10 @@ export function normalizeMarkdownWhitespace(markdown: string): string {
  *
  * This is the main serialization function that should be used
  * after getting markdown from Tiptap editor.
+ *
+ * Pipeline steps (in order):
+ * 1. postprocessMarkdown   — strip ZWS, &nbsp;, CRLF, trailing whitespace, POSIX newline
+ * 2. collapseParagraphGaps — collapse \n\n → \n between blocks (blank lines preserved via ZWS round-trip)
  *
  * @param markdown - Raw markdown from editor
  * @returns Cleaned and postprocessed markdown
@@ -81,11 +96,11 @@ export function serializeMarkdown(markdown: string): string {
     return '';
   }
 
-  // Apply postprocessing steps
+  // Step 1: Strip ZWS, &nbsp;, normalize CRLF, ensure POSIX newline
   let serialized = postprocessMarkdown(markdown);
 
-  // Apply whitespace normalization
-  serialized = normalizeMarkdownWhitespace(serialized);
+  // Step 2: Collapse \n\n → \n (Tiptap block separator → single newline; blank lines preserved via ZWS count)
+  serialized = collapseParagraphGaps(serialized);
 
   return serialized;
 }

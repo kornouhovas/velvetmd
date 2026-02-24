@@ -37,17 +37,22 @@ interface EditorState {
 }
 
 /**
- * Overrides Enter to insert a soft line break (hardBreak) instead of a new paragraph.
+ * Overrides Enter at depth 1 (top-level paragraphs and headings) to split blocks
+ * without carrying over active marks.
  *
  * Behavior:
- * - Enter in a top-level paragraph → inserts hardBreak (serialized as \n via postprocessMarkdown)
- * - Double Enter (Enter when cursor is at end of paragraph and last child is hardBreak)
- *   → deletes the trailing hardBreak and splits the block (= new paragraph / blank line in file)
- * - Enter in any other context (list item, heading, code block, blockquote) → default behavior
+ * - Enter in a top-level heading → splitBlock (new paragraph), clears active marks
+ * - Enter in a top-level paragraph → splitBlock (new paragraph, serialized as \n after
+ *   collapseParagraphGaps; double Enter produces an empty paragraph → \n\n = blank line)
+ * - Enter in any other context (list item, code block, blockquote at depth 2+) → default behavior
  *
  * Why depth === 1: In ProseMirror, $from.depth is the number of ancestor nodes.
  * A cursor inside a top-level paragraph has depth 1 (doc → paragraph → cursor).
  * List/blockquote paragraphs have depth 2+.
+ *
+ * Why tr.setStoredMarks([]): setStoredMarks clears the marks that will be applied to
+ * the NEXT typed character. This prevents bold/italic from carrying over to a new line.
+ * It is distinct from unsetAllMarks() which removes marks from selected text.
  */
 const SoftBreaksExtension = Extension.create({
   name: 'softBreaks',
@@ -57,51 +62,37 @@ const SoftBreaksExtension = Extension.create({
     return {
       Enter: () => {
         const { state } = this.editor;
-        const { $from, empty } = state.selection;
+        const { $from } = state.selection;
+        const parentType = $from.parent.type.name;
 
-        // Only override Enter inside top-level paragraphs (depth 1 = direct child of doc)
-        if ($from.parent.type.name !== 'paragraph' || $from.depth !== 1) {
+        // Only override Enter inside direct children of doc (depth 1)
+        // Lists, blockquotes etc. have depth 2+ and use default Enter behavior
+        if ($from.depth !== 1) {
           return false;
         }
 
-        // Non-empty selection: replace with hard break
-        if (!empty) {
-          return this.editor.commands.setHardBreak();
-        }
-
-        const node = $from.parent;
-        const offset = $from.parentOffset;
-
-        // Empty paragraph or ZWS-only placeholder: Enter creates a new paragraph directly.
-        // Without this check, Enter would insert a hardBreak into the empty paragraph,
-        // requiring a second Enter to actually move to a new paragraph.
-        const isEffectivelyEmpty =
-          node.content.size === 0 ||
-          (node.content.size === 1 &&
-            node.firstChild?.type.name === 'text' &&
-            node.firstChild.text === '\u200B');
-
-        if (isEffectivelyEmpty) {
-          return this.editor.commands.splitBlock();
-        }
-
-        // Double Enter: cursor at end of paragraph and last child is a hardBreak
-        // → remove trailing hardBreak and create new paragraph (blank line in file)
-        if (offset === node.content.size && node.lastChild?.type.name === 'hardBreak') {
+        // Heading at depth 1: split block without carrying over marks
+        if (parentType === 'heading') {
           return this.editor.chain()
-            .command(({ tr, dispatch }) => {
-              if (dispatch) {
-                // Delete the trailing hardBreak (nodeSize = 1)
-                tr.delete($from.pos - 1, $from.pos);
-              }
+            .splitBlock({ keepMarks: false })
+            .command(({ tr }) => {
+              tr.setStoredMarks([]);
               return true;
             })
-            .splitBlock()
             .run();
         }
 
-        // Single Enter: insert hard break (stays in same paragraph, adds \n to file)
-        return this.editor.commands.setHardBreak();
+        if (parentType !== 'paragraph') {
+          return false;
+        }
+
+        return this.editor.chain()
+          .splitBlock({ keepMarks: false })
+          .command(({ tr }) => {
+            tr.setStoredMarks([]);
+            return true;
+          })
+          .run();
       }
     };
   }

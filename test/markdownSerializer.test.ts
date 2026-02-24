@@ -2,7 +2,7 @@ import { test, describe } from 'node:test';
 import * as assert from 'node:assert/strict';
 import {
   postprocessMarkdown,
-  normalizeMarkdownWhitespace,
+  collapseParagraphGaps,
   serializeMarkdown
 } from '../src/utils/markdownSerializer';
 
@@ -20,7 +20,7 @@ describe('postprocessMarkdown', () => {
     assert.strictEqual(postprocessMarkdown('hello   \nworld'), 'hello\nworld\n');
   });
 
-  test('does not collapse excessive newlines (delegated to normalizeMarkdownWhitespace)', () => {
+  test('does not collapse excessive newlines (delegated to collapseParagraphGaps)', () => {
     assert.strictEqual(postprocessMarkdown('a\n\n\n\nb'), 'a\n\n\n\nb\n');
   });
 
@@ -34,37 +34,70 @@ describe('postprocessMarkdown', () => {
   });
 });
 
-describe('normalizeMarkdownWhitespace', () => {
-  test('does not modify sequences of exactly 3 newlines (below threshold)', () => {
-    // 3 newlines = 2 blank lines: not touched (threshold is 4+)
-    assert.strictEqual(normalizeMarkdownWhitespace('a\n\n\nb'), 'a\n\n\nb');
+describe('collapseParagraphGaps', () => {
+  test('collapses \\n\\n between paragraphs', () => {
+    assert.strictEqual(collapseParagraphGaps('para 1\n\npara 2\n'), 'para 1\npara 2\n');
   });
 
-  test('halves a sequence of 4 newlines (1 ZWS placeholder round-trip)', () => {
-    // 4 → 2: one blank line preserved
-    assert.strictEqual(normalizeMarkdownWhitespace('a\n\n\n\nb'), 'a\n\nb');
+  test('collapses \\n\\n after heading', () => {
+    assert.strictEqual(collapseParagraphGaps('# Heading\n\ntext\n'), '# Heading\ntext\n');
   });
 
-  test('halves a sequence of 6 newlines (2 ZWS placeholders)', () => {
-    // 6 → 3: two blank lines preserved
-    assert.strictEqual(normalizeMarkdownWhitespace('a\n\n\n\n\n\nb'), 'a\n\n\nb');
+  test('collapses consecutive headings', () => {
+    assert.strictEqual(collapseParagraphGaps('# H1\n\n## H2\n\ntext\n'), '# H1\n## H2\ntext\n');
   });
 
-  test('halves a sequence of 12 newlines (5 blank lines)', () => {
-    // 12 → 6: five blank lines preserved
-    assert.strictEqual(normalizeMarkdownWhitespace('a\n\n\n\n\n\n\n\n\n\n\n\nb'), 'a\n\n\n\n\n\nb');
+  test('preserves 1 blank line from 4 newlines', () => {
+    // 4 newlines → 2 pairs → \n\n (1 blank line)
+    assert.strictEqual(collapseParagraphGaps('a\n\n\n\nb'), 'a\n\nb');
   });
 
-  test('does not change content with single blank line', () => {
-    assert.strictEqual(normalizeMarkdownWhitespace('a\n\nb'), 'a\n\nb');
+  test('preserves 2 blank lines from 6 newlines', () => {
+    // 6 newlines → 3 pairs → \n\n\n (2 blank lines)
+    assert.strictEqual(collapseParagraphGaps('a\n\n\n\n\n\nb'), 'a\n\n\nb');
+  });
+
+  test('preserves 5 blank lines from 12 newlines', () => {
+    // 12 newlines → 6 pairs → \n\n\n\n\n\n (5 blank lines)
+    assert.strictEqual(collapseParagraphGaps('a\n\n\n\n\n\n\n\n\n\n\n\nb'), 'a\n\n\n\n\n\nb');
+  });
+
+  test('does not modify single newline', () => {
+    assert.strictEqual(collapseParagraphGaps('a\nb'), 'a\nb');
+  });
+
+  test('handles odd newline count (3 newlines)', () => {
+    // \n\n\n → first pair \n\n → \n, then remaining \n → \n\n
+    assert.strictEqual(collapseParagraphGaps('a\n\n\nb'), 'a\n\nb');
   });
 
   test('returns empty string for empty/invalid input', () => {
-    assert.strictEqual(normalizeMarkdownWhitespace(''), '');
+    assert.strictEqual(collapseParagraphGaps(''), '');
   });
 
-  test('returns whitespace-only input unchanged (guard does not trim)', () => {
-    assert.strictEqual(normalizeMarkdownWhitespace('   '), '   ');
+  test('protects backtick fenced code block', () => {
+    const input = 'intro\n\n```\nline1\n\nline2\n```\n\noutro\n';
+    const result = collapseParagraphGaps(input);
+    assert.strictEqual(result, 'intro\n```\nline1\n\nline2\n```\noutro\n');
+  });
+
+  test('protects tilde fenced code block', () => {
+    const input = 'intro\n\n~~~\nline1\n\nline2\n~~~\n\noutro\n';
+    const result = collapseParagraphGaps(input);
+    assert.strictEqual(result, 'intro\n~~~\nline1\n\nline2\n~~~\noutro\n');
+  });
+
+  test('protects code block with language tag', () => {
+    const input = 'before\n\n```typescript\nconst x = 1;\n\nconst y = 2;\n```\n\nafter\n';
+    const result = collapseParagraphGaps(input);
+    assert.strictEqual(result, 'before\n```typescript\nconst x = 1;\n\nconst y = 2;\n```\nafter\n');
+  });
+
+  test('mismatched fence chars are not protected (backtick open, tilde close)', () => {
+    // The ``` fence is never closed by ~~~, so no extraction occurs
+    const input = 'intro\n\n```\ncode\n~~~\n\noutro\n';
+    const result = collapseParagraphGaps(input);
+    assert.strictEqual(result, 'intro\n```\ncode\n~~~\noutro\n');
   });
 });
 
@@ -81,5 +114,15 @@ describe('serializeMarkdown', () => {
 
   test('preserves inline code', () => {
     assert.strictEqual(serializeMarkdown('`code`'), '`code`\n');
+  });
+
+  test('full pipeline: collapses blank line after heading', () => {
+    // Simulates raw Tiptap output: heading followed by \n\n before paragraph
+    assert.strictEqual(serializeMarkdown('# Title\n\ntext\n'), '# Title\ntext\n');
+  });
+
+  test('full pipeline: collapses \\n\\n between paragraphs', () => {
+    // Single Enter produces splitBlock → \n\n in raw Tiptap → collapsed to \n
+    assert.strictEqual(serializeMarkdown('para 1\n\npara 2\n'), 'para 1\npara 2\n');
   });
 });

@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.1] - 2026-02-25
+
+### Fixed
+
+- **Enter key now moves cursor visibly** — replaced `hardBreak` (invisible trailing `<br>`) with `splitBlock` for single Enter in top-level paragraphs. Cursor now moves to a new paragraph on every Enter press.
+- **Double Enter creates a blank line** — two consecutive Enters produce an empty paragraph node, which serializes to `\n\n` (one blank line in file). Semantics unchanged from user's perspective, mechanism is now consistent.
+
+### Changed
+
+- **Serializer pipeline simplified** — replaced `normalizeMarkdownWhitespace` + `collapseHeadingGaps` (3-step) with `collapseParagraphGaps` (2-step). New function collapses all `\n\n` → `\n` outside fenced code blocks; blank lines are preserved via ZWS placeholder round-trip. Fenced code block content is protected with placeholder extraction using `[ \t]*` (not `\s*`) to avoid consuming the trailing newline of the closing fence.
+- `SoftBreaksExtension` paragraph handler reduced from ~65 lines to ~8 lines — all paragraph Enter variants now handled by a single `splitBlock` chain.
+
 ## [0.3.0] - 2026-02-23
 
 ### Added

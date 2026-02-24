@@ -2,7 +2,7 @@
   "name": "velvet-md",
   "displayName": "Velvet MD",
   "description": "WYSIWYG-style live preview editor for Markdown with focus mode",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "aleksandersk",
   "license": "MIT",
   "repository": {

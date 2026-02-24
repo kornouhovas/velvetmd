@@ -145,9 +145,9 @@ Defined in `src/types.ts`:
 #### Serialization (Editor → Markdown)
 Located in `src/utils/markdownSerializer.ts`:
 
-- `serializeMarkdown()` - Main entry point; calls both steps below
+- `serializeMarkdown()` - Main entry point; calls both steps below in order
 - `postprocessMarkdown()` - Strips ZWS placeholders, removes `&nbsp;`, normalizes CRLF, trims trailing whitespace, ensures POSIX trailing newline
-- `normalizeMarkdownWhitespace()` - Halves sequences of 4+ newlines to restore blank line count: `K blank lines → 2*(K+1)` newlines in raw output → `K+1` after halving
+- `collapseParagraphGaps()` - Collapses all `\n\n` → `\n` outside fenced code blocks. Single Enter → `splitBlock` → Tiptap `\n\n` → collapsed to `\n`. Double Enter → empty paragraph → 4 raw newlines → collapsed to `\n\n` (one blank line). Math: K blank lines via ZWS → 2*(K+1) raw newlines → K+1 newlines after collapse = K blank lines preserved.
 
 **Important:** Raw Tiptap output may not preserve formatting perfectly. The `serializeMarkdown()` utility fixes these issues, which is why some round-trip tests are expected to fail (they test raw output).
 
@@ -164,10 +164,13 @@ Located in `src/editor/webview/editor.ts`:
 - **Update flow:**
   - User edits → `onUpdate` (30ms debounce) → `serializeMarkdown()` → `postMessage('update')`
   - Extension message → `handleDocumentChanged` → content equality check → `setContent({ emitUpdate: false })` + scroll restore (only when content actually changed)
+- **Heading margins (Notion-like, visual only):** `media/webview/styles.css` sets `margin-top`/`margin-bottom` on `h1`–`h6` inside `.ProseMirror` to create visual spacing between sections. First child has `margin-top: 0`. The visual spacing is CSS-only; `collapseParagraphGaps()` in the serializer removes Tiptap's injected `\n\n` so the file stores `# Heading\ntext` (no blank line).
 - **`SoftBreaksExtension`** (priority 150): overrides Enter key
-  - Single Enter in a paragraph → `hardBreak` (soft line break, `\n` in file)
-  - Double Enter (Enter when last char is hardBreak) → removes hardBreak + `splitBlock` (new paragraph, blank line in file)
-  - Enter in empty/ZWS-only paragraph → `splitBlock` directly (no intermediate hardBreak)
+  - Enter in a top-level heading → `splitBlock({ keepMarks: false })` + clears stored marks (new paragraph, no mark carry-over)
+  - Enter in a top-level paragraph → `splitBlock({ keepMarks: false })` + clears stored marks; Tiptap emits `\n\n` which `collapseParagraphGaps` collapses to `\n` (single Enter = no blank line in file)
+  - Double Enter → second Enter in empty paragraph → another `splitBlock`; the empty paragraph in Tiptap emits 4 raw newlines → collapsed to `\n\n` = one blank line in file
+  - Enter in list items, blockquotes (depth 2+) → default behavior (unchanged)
+  - Mark clearing: `tr.setStoredMarks([])` prevents bold/italic from carrying over to the next typed character after Enter
 
 ### Security
 
@@ -208,7 +211,7 @@ Extension settings in `package.json` → `contributes.configuration`:
 
 **Utilities (Shared concepts, separate bundles):**
 - `src/constants.ts` - Centralized constants, `formatBytes()`
-- `src/utils/markdownSerializer.ts` - `serializeMarkdown`, `postprocessMarkdown`, `normalizeMarkdownWhitespace`
+- `src/utils/markdownSerializer.ts` - `serializeMarkdown`, `postprocessMarkdown`, `collapseParagraphGaps`
 - `src/utils/blankLinePlaceholders.ts` - `addBlankLinePlaceholders` (ZWS paragraph insertion)
 - `src/utils/scrollUtils.ts` - `scrollStateToLine`, `lineToScrollState` (with NaN/Infinity guards)
 - `src/utils/providerUtils.ts` - `isWithinCooldown`, `isEchoContent`, `isValidScrollDimension`
@@ -218,10 +221,10 @@ Extension settings in `package.json` → `contributes.configuration`:
 
 **Tests:**
 - `test/setup.ts` - JSDOM setup for testing Tiptap in Node.js
-- `test/roundtrip.test.ts` - Round-trip fidelity tests (26 test cases)
+- `test/roundtrip.test.ts` - Round-trip fidelity tests (32 tests, 13 expected raw-Tiptap failures)
 - `test/link-image.test.ts` - Link and image handling tests
 - `test/constants.test.ts` - Utility function tests (14 tests)
-- `test/markdownSerializer.test.ts` - Serializer pipeline tests (16 tests)
+- `test/markdownSerializer.test.ts` - Serializer pipeline tests (24 tests)
 - `test/blankLinePlaceholders.test.ts` - ZWS placeholder insertion tests (13 tests)
 - `test/blank-line-navigation.test.ts` - Integration: blank line structure + round-trip (9 tests)
 - `test/scrollUtils.test.ts` - Scroll conversion tests incl. NaN/Infinity (22 tests)

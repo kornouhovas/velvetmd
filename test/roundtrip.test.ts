@@ -295,19 +295,31 @@ describe('Soft Break Round-trips (breaks: true)', () => {
 
   testSoftBreakRoundTrip(
     'Para 1\n\nPara 2\n',
-    'Para 1\n\nPara 2\n',
-    'should preserve blank line as paragraph separator'
+    'Para 1\nPara 2\n',
+    'collapses \\n\\n between adjacent paragraphs (no ZWS; real files go through addBlankLinePlaceholders)'
   );
 
   testSoftBreakRoundTrip(
     'A\nB\n\nC\nD\n',
-    'A\nB\n\nC\nD\n',
-    'should preserve mixed soft breaks and paragraph separators'
+    'A\nB\nC\nD\n',
+    'collapses paragraph separator between paragraphs, preserves soft break within paragraph'
   );
 
   testSoftBreakRoundTrip(
     'Single line\n',
     'Single line\n',
     'should preserve single-line paragraph without soft break'
+  );
+
+  testSoftBreakRoundTrip(
+    '# Heading\ntext\n',
+    '# Heading\ntext\n',
+    'should collapse blank line after heading'
+  );
+
+  testSoftBreakRoundTrip(
+    '# H1\n## H2\ntext\n',
+    '# H1\n## H2\ntext\n',
+    'should collapse blank lines between consecutive headings'
   );
 });

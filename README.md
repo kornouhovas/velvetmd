@@ -4,7 +4,7 @@
 
 ## Status
 
-🚧 **Early Development** - v0.3.0
+🚧 **Early Development** - v0.3.1
 
 This extension is in active development. Features and API may change.
 
@@ -127,7 +127,7 @@ vsce package
 Install the generated `.vsix` file:
 
 ```bash
-code --install-extension velvet-md-0.3.0.vsix
+code --install-extension velvet-md-0.3.1.vsix
 ```
 
 Or in VS Code: Extensions → `⋯` menu → "Install from VSIX..."
